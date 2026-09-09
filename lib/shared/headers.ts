@@ -1,0 +1,1 @@
+export const securityHeaders: Record<string, string> = { 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'strict-origin-when-cross-origin', 'Permissions-Policy': 'camera=(), microphone=(), geolocation=()', 'Strict-Transport-Security': 'max-age=31536000', 'Content-Security-Policy': "object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests" };

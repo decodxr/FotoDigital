@@ -1,0 +1,9 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {photoQuality,defaultCrop,totals,tierPrice,parsePages,validTaxId,validCep,detectMime,safeFilename} from '../lib/shared/commerce.ts';
+test('DPI respects print dimensions, rotation and zoom',()=>{assert.equal(photoQuality(6000,4000,10,15).level,'excellent');assert.equal(photoQuality(300,200,20,30).level,'low');assert.equal(photoQuality(0,0,10,15).level,'unknown');assert.equal(photoQuality(6000,4000,10,15,{...defaultCrop,zoom:2}).dpi,339);assert.equal(photoQuality(6000,4000,10,15,{...defaultCrop,rotation:90}).dpi,1016);});
+test('PIX discount applies to merchandise after coupon, never shipping',()=>{assert.deepEqual(totals(10001,1000,1234,5),{subtotal:10001,discount:1450,shipping:1234,total:9785});assert.equal(totals(500,999,100,5).total,100);});
+test('Quantity tiers keep unconfigured base prices nullable',()=>{assert.equal(tierPrice(null,[],10),null);assert.equal(tierPrice(500,[{quantity:10,price:450},{quantity:50,price:400}],51),400);});
+test('Document page ranges are bounded and deduplicated',()=>{assert.deepEqual(parsePages('1-3, 3, 5',6),[1,2,3,5]);assert.throws(()=>parsePages('1-9',3));assert.throws(()=>parsePages('0',3));assert.throws(()=>parsePages('x',3));assert.deepEqual(parsePages('',2),[1,2]);});
+test('CPF, CNPJ and CEP validation',()=>{assert.equal(validTaxId('05.998.428/0001-99'),true);assert.equal(validTaxId('529.982.247-25'),true);assert.equal(validTaxId('111.111.111-11'),false);assert.equal(validTaxId('05.998.428/0001-90'),false);assert.equal(validCep('87302-230'),true);assert.equal(validCep('123'),false);});
+test('File magic detection and safe ZIP names',()=>{assert.equal(detectMime(new TextEncoder().encode('<script>alert(1)</script>')),null);assert.equal(detectMime(new Uint8Array([255,216,255])), 'image/jpeg');assert.equal(safeFilename('../../foto da família.jpg').includes('/'),false);});

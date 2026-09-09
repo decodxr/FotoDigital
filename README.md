@@ -114,7 +114,7 @@ npm run build
 npm run build:vercel
 ```
 
-Os testes exercitam cálculos de DPI, preços e PIX, documentos, identidade, autorização entre clientes, bootstrap, arquivos originais, checkout persistente, idempotência, ZIP, estados e disputa de estoque. O adapter SQLite/Map usado nos testes é explicitamente isolado em `tests/platform.ts`; não integra o bundle de produção. Integrações externas exigem homologação com credenciais reais e testes de dispositivos/fluxos no domínio escolhido.
+Os testes exercitam cálculos de DPI, preços e PIX, documentos, identidade, autorização entre clientes, bootstrap, arquivos originais, checkout persistente, idempotência, ZIP, estados e disputa de estoque. O teste opcional `node tests/worker.test.mjs` exercita o bundle compilado com Miniflare/D1/R2; sua execução requer permissão para abrir o runtime local e não foi concluída neste ambiente. O adapter SQLite/Map usado nos testes é explicitamente isolado em `tests/platform.ts`; não integra o bundle de produção. Integrações externas exigem homologação com credenciais reais e testes de dispositivos/fluxos no domínio escolhido.
 
 ## Imagens e conteúdo
 
