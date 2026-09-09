@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic';
 import { Toaster } from 'sonner';
 import { StoreProvider } from './context';
 import { Home } from './home';
+import { ExperienceMotion } from './motion';
 import { Footer, Header, WhatsApp } from './shell';
 import { Loading, Notice } from './ui';
 const CatalogPage = dynamic(() => import('./catalog').then(m => m.CatalogPage), { loading: () => <Loading /> });
@@ -88,5 +89,5 @@ export function StoreApp({ initial, path = '/', query = '', productSlug = '' }: 
             break;
         default: content = <PolicyPage slug={parts[0]}/>;
     }
-    return <StoreProvider initial={initial}>{parts[0] === 'admin' ? content : <><a href="#conteudo" className="skip-link">Ir para o conteúdo</a><Header path={path}/><main id="conteudo">{initial.unavailable && <div className="container"><Notice>Estamos com dificuldade para consultar a loja. Tente novamente em instantes ou fale conosco pelo WhatsApp.</Notice></div>}{content}</main><Footer /><WhatsApp path={path}/></>}<Toaster position="bottom-center" richColors/></StoreProvider>;
+    return <StoreProvider initial={initial}><ExperienceMotion path={path}>{parts[0] === 'admin' ? content : <><a href="#conteudo" className="skip-link">Ir para o conteúdo</a><Header path={path}/><main id="conteudo">{initial.unavailable && <div className="container"><Notice>Estamos com dificuldade para consultar a loja. Tente novamente em instantes ou fale conosco pelo WhatsApp.</Notice></div>}<div className="page-transition" key={path}>{content}</div></main><Footer /><WhatsApp path={path}/></>}</ExperienceMotion><Toaster position="bottom-center" theme="light" richColors/></StoreProvider>;
 }

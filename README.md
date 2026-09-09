@@ -14,6 +14,10 @@ O projeto reúne loja, revelação de fotos, documentos, personalizados, área d
 - Modelagem Drizzle com 28 tabelas, migrations SQL D1 e versão PostgreSQL. Não utiliza Prisma: os adapters evitam acoplar a aplicação a um engine incompatível com a hospedagem Sites. PostgreSQL preserva as mesmas entidades e regras.
 - Variantes, campos configuráveis, endereços e snapshots são documentos JSON tipados/validados, sem blobs de imagens no banco. `users` reúne identidade e perfil do cliente; `uploads`/`photoConfigurations` representam arquivos e instruções de impressão.
 
+## Identidade e movimento
+
+O visual utiliza superfícies com tom de papel, verde profundo e tipografia Newsreader/DM Sans hospedada no próprio site. A home combina fotografias, categorias visuais e conteúdo editorial. O padrão segue no catálogo, upload, checkout, conta e administração. Animações usam CSS e IntersectionObserver, sem dependência adicional; respeitam `prefers-reduced-motion`, mantêm o conteúdo disponível sem JavaScript e revelam elementos quando recebem foco pelo teclado.
+
 ## Funcionalidades
 
 Catálogo, busca com sugestões, filtros, paginação da apresentação, favoritos locais e autenticados; carrinho persistente com edição e duplicação; checkout com cálculo financeiro no servidor, cupons, retirada gratuita e cotações persistidas com expiração; PIX copia e cola com desconto de 5% e confirmação **manual**; checkout de cartão hospedado quando conectado; pedidos, histórico e repetição com revalidação de preço, estoque e arquivos.
