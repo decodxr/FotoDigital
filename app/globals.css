@@ -3,6 +3,7 @@
 @import "tw-animate-css";
 @import "../vendor/shadcn-tailwind-4.13.0.css";
 @import "./experience.css";
+@import "./showcase.css";
 
 @utility scrollbar-thin {
   scrollbar-width: thin;
@@ -23,39 +24,39 @@
 :root {
   color-scheme: light;
   --font-body: 'DM Sans', Arial, Helvetica, sans-serif;
-  --font-display: 'Newsreader', Georgia, 'Times New Roman', serif;
-  --background: #fbf9f5;
-  --foreground: #25382f;
-  --card: #fffefa;
-  --card-foreground: #25382f;
-  --popover: #fffefa;
-  --popover-foreground: #25382f;
-  --primary: #284d3f;
-  --primary-foreground: #fffefa;
-  --secondary: #edece3;
-  --secondary-foreground: #25382f;
-  --muted: #eeece5;
-  --muted-foreground: #686b62;
-  --accent: #eeece5;
-  --accent-foreground: #284d3f;
-  --destructive: #ab3f30;
-  --border: #deded3;
-  --input: #d6d8cb;
-  --ring: #688a72;
-  --chart-1: #284d3f;
-  --chart-2: #a96043;
-  --chart-3: #728774;
-  --chart-4: #b99862;
-  --chart-5: #6e7972;
-  --radius: 0.875rem;
-  --sidebar: #f0f1e9;
-  --sidebar-foreground: #25382f;
-  --sidebar-primary: #284d3f;
-  --sidebar-primary-foreground: #fffefa;
-  --sidebar-accent: #e2e8dc;
-  --sidebar-accent-foreground: #25382f;
-  --sidebar-border: #deded3;
-  --sidebar-ring: #688a72;
+  --font-display: 'DM Sans', Arial, Helvetica, sans-serif;
+  --background: #ffffff;
+  --foreground: #222222;
+  --card: #ffffff;
+  --card-foreground: #222222;
+  --popover: #ffffff;
+  --popover-foreground: #222222;
+  --primary: #242424;
+  --primary-foreground: #ffffff;
+  --secondary: #f2f2f2;
+  --secondary-foreground: #252525;
+  --muted: #f4f4f4;
+  --muted-foreground: #626262;
+  --accent: #eeeeee;
+  --accent-foreground: #222222;
+  --destructive: #a12727;
+  --border: #e1e1e1;
+  --input: #d3d3d3;
+  --ring: #626262;
+  --chart-1: #222222;
+  --chart-2: #4c4c4c;
+  --chart-3: #747474;
+  --chart-4: #999999;
+  --chart-5: #c1c1c1;
+  --radius: 0.75rem;
+  --sidebar: #f7f7f7;
+  --sidebar-foreground: #222222;
+  --sidebar-primary: #242424;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #eaeaea;
+  --sidebar-accent-foreground: #222222;
+  --sidebar-border: #e1e1e1;
+  --sidebar-ring: #626262;
 }
 
 @theme inline {

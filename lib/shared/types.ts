@@ -192,6 +192,8 @@ export type Catalog = {
         subtitle: string;
         image: string;
         link: string;
+        sortOrder: number;
+        illustrative: number;
     }[];
     settings: StoreSettings;
     unavailable?: boolean;

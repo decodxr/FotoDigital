@@ -17,3 +17,6 @@ As fotos abaixo são referências visuais licenciadas no Pexels, não trabalhos 
 
 
 Fontes originais: [DM Sans](https://github.com/google/fonts/tree/main/ofl/dmsans) e [Newsreader](https://github.com/google/fonts/tree/main/ofl/newsreader). As fontes de título são fixadas no tamanho óptico 48 e peso 400; a fonte de interface no tamanho óptico 14, reduzindo o volume transferido.
+
+
+A versão atual usa somente DM Sans na interface. A marca `public/brand/foto-digital.png` foi criada com imagegen a partir da logo anexada pelo proprietário, preservando FOTO DIGITAL e a abertura multicolorida. Não contém identidade de representação oficial Fujifilm. Newsreader permanece apenas como asset legado sem carregamento no layout. As fotos iniciais da vitrine usam as mesmas fontes de revelação, Polaroid, caneca, álbum e ensaio feminino listadas acima e estão marcadas individualmente como ilustrativas; podem ser substituídas pelo administrador.

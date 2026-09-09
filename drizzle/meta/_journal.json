@@ -8,6 +8,13 @@
       "when": 1788884852472,
       "tag": "0000_omniscient_felicia_hardy",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1788995040119,
+      "tag": "0001_misty_pepper_potts",
+      "breakpoints": true
     }
   ]
 }

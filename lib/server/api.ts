@@ -1,3 +1,4 @@
+import { uploadStoreMedia, readStoreMedia } from './store-media';
 import { config, platformName } from '@/lib/server/platform';
 import type { OrderStatus } from '@/lib/shared/types';
 import { z, ZodError } from 'zod';
@@ -20,6 +21,7 @@ export async function handleApi(req: Request, path: string[]): Promise<Response>
             const identity = await owner(req);
             await rateLimit('api:' + (identity.key ?? req.headers.get('cf-connecting-ip') ?? req.headers.get('x-real-ip') ?? 'anonymous'), resource === 'uploads' ? 800 : 100, 60);
         }
+        if (resource === 'store-media' && method === 'GET') return await readStoreMedia(req, id);
         if (resource === 'catalog' && method === 'GET')
             return respond(await catalog());
         if (resource === 'session' && method === 'GET') {
@@ -244,6 +246,7 @@ export async function handleApi(req: Request, path: string[]): Promise<Response>
                 return respond({ ok: true });
             }
             await requireUser(req, true);
+            if (id === 'media' && method === 'POST') return respond(await uploadStoreMedia(req), 201);
             if (id === 'files' && action === 'prune' && method === 'POST')
                 return respond(await pruneFiles(req));
             if (id === 'order' && action) {

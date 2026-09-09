@@ -18,8 +18,26 @@ test('Commerce API: identity, originals, PDF pages, checkout, ZIP and concurrenc
  assert.equal((await admin.call('admin/printSizes/10x15','PATCH',{name:'10 × 15 cm',width:10,height:15,price:500,active:1,finishes:['Fosco'],tiers:[{quantity:10,price:400}]})).status,200);
  const original=Uint8Array.from(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a2l0AAAAASUVORK5CYII=','base64'));
  async function upload(c,bytes,mime,name){const init=await c.call('uploads','POST',{name,mime,bytes:bytes.length,width:6000,height:4000,consent:true});assert.equal(init.status,200,await init.clone().text());const {id}=await init.json();const done=await c.call('uploads/'+id,'PUT',bytes,{'content-length':String(bytes.length)});assert.equal(done.status,200,await done.clone().text());return await done.json();}
+
+ // Storefront photographs are editable and separately authorized from customer originals.
+ assert.equal(initial.banners.length,5);
+ assert.equal(initial.banners.every((slide,i)=>slide.sortOrder===i+1&&slide.illustrative===1),true);
+ assert.equal((await a.call('admin/media','POST',original)).status,403);
+ assert.equal((await admin.call('admin/media','POST',new TextEncoder().encode('<svg onload="alert(1)"></svg>'))).status,415);
+ const mediaResponse=await admin.call('admin/media','POST',original);assert.equal(mediaResponse.status,201);const media=await mediaResponse.json();
+ assert.equal((await a.call('store-media/'+media.id)).status,403);
+ assert.equal((await admin.call('store-media/'+media.id)).status,200);
+ const banner={title:'Foto autorizada da loja',subtitle:'Descrição editável da vitrine.',image:media.url,link:'/revelacao',active:1,illustrative:0,sortOrder:0};
+ r=await admin.call('admin/banners','POST',banner);assert.equal(r.status,200,await r.clone().text());const savedBanner=await r.json();
+ r=await a.call('catalog');const withBanner=await r.json();assert.equal(withBanner.banners[0].id,savedBanner.id);assert.equal(withBanner.banners[0].subtitle,banner.subtitle);
+ r=await b.call('store-media/'+media.id);assert.equal(r.status,200);assert.match(r.headers.get('cache-control'),/^public/);assert.deepEqual(new Uint8Array(await r.arrayBuffer()),original);
+ assert.equal((await admin.call('admin/banners/'+savedBanner.id,'PATCH',{...banner,link:'/\\attacker.example'})).status,422);
+ assert.equal((await admin.call('admin/banners/'+savedBanner.id,'DELETE')).status,200);
+ assert.equal((await b.call('store-media/'+media.id)).status,403);
+ assert.equal((await (await a.call('catalog')).json()).banners.some(x=>x.id===savedBanner.id),false);
  const photo=await upload(a,original,'image/png','família original.png');
  r=await a.call('files/'+photo.id);assert.deepEqual(new Uint8Array(await r.arrayBuffer()),original);assert.equal((await b.call('files/'+photo.id)).status,403);
+ assert.equal((await b.call('store-media/'+photo.id)).status,404);
  const item={productId:'fotos-tradicionais',quantity:1,fields:{},photos:[{photoId:photo.id,sizeId:'10x15',quantity:10,finish:'Fosco',crop:{x:50,y:50,zoom:1,rotation:0,fit:'cover'},qualityAccepted:true}]};
  r=await a.call('cart','POST',item);assert.equal(r.status,200,await r.clone().text());const photoCart=await r.json();assert.equal(photoCart.subtotal,4000);assert.equal(shippingItems(photoCart.items)[0].quantity,10);assert.equal(shippingItems([{...photoCart.items[0],quantity:2}])[0].quantity,20);
  const checkout={customer:{name:'Pessoa de teste',email:'a@test.example',phone:'44997372702',taxId:'05.998.428/0001-99'},delivery:'pickup',paymentMethod:'pix',consent:true,idempotencyKey:crypto.randomUUID()};

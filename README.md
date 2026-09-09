@@ -125,3 +125,16 @@ Os testes exercitam cálculos de DPI, preços e PIX, documentos, identidade, aut
 Veja [docs/assets.md](docs/assets.md). A identidade visual usa fotografias ilustrativas de bancos de imagem, declaradas como tais. Galerias de inspiração não são apresentadas como portfólio da empresa. Substitua-as pelas fotos autorizadas da loja pelo painel ou assets públicos. Não há avaliações falsas, horários de funcionamento ou preços não informados.
 
 Políticas de privacidade, envio, trocas e termos estão em `components/store/institutional.tsx` e devem refletir a operação efetiva ao abrir a loja. Referência legal utilizada para compras à distância: [CDC, art. 49](https://www.planalto.gov.br/ccivil_03/leis/l8078compilado.htm).
+
+
+## Vitrine animada e identidade visual
+
+A interface usa DM Sans local, superfícies brancas e cinza e controles em carvão. A logo em `public/brand/foto-digital.png` foi modernizada a partir da marca enviada pelo proprietário; a abertura multicolorida permanece o destaque cromático da identidade. `app/showcase.css` define a direção visual e `components/store/showcase.tsx` a vitrine em perspectiva.
+
+No **/admin → Vitrine animada**, adicione ou edite um destaque. Envie uma foto JPG/PNG, preencha título, descrição e página de destino, escolha a posição e ative o registro. Os oito primeiros registros ativos, ordenados por posição, aparecem imediatamente na home após atualização. É possível arquivar, reordenar e substituir as fotografias. A identificação “imagem ilustrativa” é configurável por foto. Os cinco destaques iniciais usam as fontes já documentadas, sem atribuição de portfólio à empresa; são inseridos uma única vez, preservando banners existentes e sem recriar registros arquivados.
+
+O envio da vitrine é exclusivo de administradores: até 20 MB no seletor, versão JPEG de até 1600 px preparada no navegador e limite de 6 MB validado no servidor. **Essa otimização se aplica apenas à imagem comercial da vitrine**. Fotografias de clientes para impressão continuam preservadas integralmente. Imagens da vitrine ficam em `storefront/` no mesmo storage privado, com metadados em `storeMedia`. A rota `/api/store-media/[id]` permite leitura pública apenas quando a foto está vinculada a um destaque ativo; prévias não publicadas exigem administrador. Ao arquivar, a cópia eventualmente em cache expira em até 60 segundos. A rotina de retenção de fotografias de clientes não remove imagens comerciais; registros comerciais não referenciados permanecem armazenados para manutenção administrativa do bucket.
+
+A rotação automática ocorre a cada 6,5 segundos. Setas, indicadores, gestos horizontais e teclado permitem navegação manual. A apresentação pausa após interação ou foco no conteúdo e quando a aba/vitrine deixa de estar visível; a preferência de movimento reduzido desativa reprodução automática e transições. O botão de reprodução permite retomar. Nenhum novo serviço ou segredo externo é necessário no Sites; na Vercel, utiliza os adapters PostgreSQL/S3 já existentes.
+
+As migrations incrementais `drizzle/0001_misty_pepper_potts.sql` e `db/postgres/0001_showcase.sql` acrescentam apenas a mídia comercial e os campos de ordenação/identificação ilustrativa. A migração inicial permanece intacta.

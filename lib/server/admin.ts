@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ensureShowcaseSeed } from './showcase';
 import { catalog, getSettings } from './catalog';
 import { insert, json, now, one, query, transaction, uid, update } from './db';
 import { audit, requireUser, requireValue } from './security';
@@ -6,7 +7,7 @@ const text = z.string().trim().min(1).max(200);
 const slug = z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
 const flag = z.number().int().min(0).max(1);
 const price = z.number().int().min(0).max(100000000).nullable();
-const image = z.string().max(2000).refine(v => !v || v.startsWith('/images/') || /^https:\/\/(images\.pexels\.com|images\.unsplash\.com|[^/]+\.(?:r2\.dev|amazonaws\.com))\//.test(v), 'Use uma imagem HTTPS de uma fonte permitida.');
+const image = z.string().max(2000).refine(v => !v || v.startsWith('/images/') || /^\/api\/store-media\/[a-f0-9-]{36}$/.test(v) || /^https:\/\/(images\.pexels\.com|images\.unsplash\.com|[^/]+\.(?:r2\.dev|amazonaws\.com))\//.test(v), 'Use uma imagem HTTPS de uma fonte permitida.');
 const schemas = {
     products: z.object({ name: text, slug, description: z.string().min(10).max(8000), categoryId: text, kind: z.enum(['product', 'photo', 'document', 'quote']), image, images: z.array(image).max(10), price, salePrice: price, stock: z.number().int().min(0).nullable(), active: flag, featured: flag, tags: z.array(text).max(30), fields: z.array(z.object({ key: slug, label: text, type: z.enum(['text', 'textarea', 'date', 'photo', 'select']), required: z.boolean(), options: z.array(text).optional() })).max(20), variants: z.array(z.object({ id: slug, name: text, price, stock: z.number().int().min(0).nullable() })).max(40), productionDays: z.number().int().min(0).max(120), weight: z.number().int().positive().nullable(), width: z.number().positive().nullable(), height: z.number().positive().nullable(), length: z.number().positive().nullable() }),
     categories: z.object({ name: text, slug, description: z.string().max(2000), image, active: flag }),
@@ -14,7 +15,7 @@ const schemas = {
     coupons: z.object({ code: z.string().trim().min(3).max(60).transform(s => s.toUpperCase()), type: z.enum(['percent', 'fixed']), value: z.number().int().nonnegative(), minAmount: z.number().int().nonnegative(), expiresAt: z.string().datetime().nullable(), categories: z.array(text), maxUses: z.number().int().positive().nullable(), perCustomer: z.number().int().positive().max(20), firstPurchase: flag, active: flag }).refine(c => c.type !== 'percent' || c.value <= 100, 'Percentual máximo: 100%.'),
     testimonials: z.object({ name: text, rating: z.number().int().min(1).max(5), comment: z.string().min(5).max(2000), active: flag }),
     services: z.object({ name: text, slug, description: z.string().min(10).max(8000), image, gallery: z.array(image).max(20), faq: z.array(z.object({ question: text, answer: z.string().max(2000) })).max(20), active: flag }),
-    banners: z.object({ title: text, subtitle: z.string().max(500), image, link: z.string().regex(/^\/(?!\/)/), active: flag }),
+    banners: z.object({ title: text, subtitle: z.string().max(500), image: image.refine(v => !!v, 'Escolha uma fotografia.'), link: z.string().max(500).regex(/^\/(?![\/\\])[^\s\\]*$/, 'Informe um caminho interno, como /revelacao.'), active: flag, sortOrder: z.number().int().min(0).max(999).default(0), illustrative: flag.default(0) }),
 };
 export const settingsSchema = z.object({ pixDiscount: z.number().min(0).max(100), pixEnabled: z.boolean(), retentionDays: z.number().int().min(1).max(3650), maxUploadMb: z.number().int().min(1).max(25), maxPhotos: z.number().int().min(1).max(200), documentBw: price, documentColor: price, documentDuplex: z.boolean(), photoSheetCount: z.number().int().min(1).max(100), polaroidCaption: z.boolean(), installments: z.number().int().min(1).max(24), installmentText: z.string().max(500), storeOpen: z.boolean(), shippingNotice: z.string().max(500) });
 export type AdminEntity = keyof typeof schemas;
@@ -28,8 +29,9 @@ export async function adminData(req: Request, entity: string) {
         return getSettings();
     const allowed = [...Object.keys(schemas), 'orders', 'users', 'inquiries', 'auditLogs'];
     requireValue(allowed.includes(entity), 'Área inválida.', 404);
+    if (entity === 'banners') await ensureShowcaseSeed();
     const columns = entity === 'users' ? 'id,name,email,phone,"taxId",role,"createdAt"' : '*';
-    const rows = await query<Record<string, unknown>>(`SELECT ${columns} FROM "${entity}" LIMIT 500`);
+    const rows = await query<Record<string, unknown>>(`SELECT ${columns} FROM "${entity}"${entity === 'banners' ? ' ORDER BY "sortOrder",id' : ''} LIMIT 500`);
     const inventory = entity === 'products' ? await query<{id:string;available:number}>('SELECT id,available FROM inventory') : [];
     return rows.map(r => { const result = { ...r }; for (const k of ['fields', 'tags', 'images', 'variants', 'finishes', 'tiers', 'categories', 'gallery', 'faq', 'customer', 'address'])
         if (k in result)
