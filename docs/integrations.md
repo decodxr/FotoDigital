@@ -2,15 +2,15 @@
 
 Todos os preços são centavos inteiros BRL. Segredos ficam no servidor. Falhas e timeouts não geram preços de substituição.
 
-## S3 e Cloudflare R2
+## Supabase Storage, S3 e Cloudflare R2
 
 No Sites, `DB` e `BUCKET` são bindings gerenciados. O upload é transmitido ao R2 sem passar por disco nem banco. No Vercel, defina:
 
-- `S3_ENDPOINT`: endpoint HTTPS do serviço, sem bucket no caminho.
+- `S3_ENDPOINT`: endpoint HTTPS do serviço, sem bucket no caminho. No Supabase, preserve o prefixo `/storage/v1/s3` copiado do painel.
 - `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`.
-- `S3_REGION`: `auto` para R2; região correta para S3.
+- `S3_REGION`: região exata do Supabase/S3; `auto` somente para R2.
 
-O signer implementa AWS Signature V4, endereçamento por caminho, URLs de cinco minutos. Mantenha o bucket **privado**, sem website/public access, e habilite CORS com a origem exata do site, métodos PUT, GET e HEAD, headers Content-Type e os headers da requisição assinada. Não use `*` para origens em produção. Credencial limitada ao bucket e operações necessárias. Downloads passam por autorização no backend.
+O signer implementa AWS Signature V4, endereçamento por caminho e URLs de cinco minutos; no upload direto, o MIME normalizado faz parte da assinatura. Mantenha o bucket **privado**. No AWS S3/R2, habilite CORS para o domínio exato da loja e PUT/GET/HEAD, com Content-Type, e limite a credencial ao bucket. No Supabase, habilite a conexão S3 no painel e use suas credenciais próprias; elas têm acesso elevado e ficam exclusivamente no servidor. A API PutBucketCors não é suportada no Supabase; o diagnóstico verifica o preflight do endpoint. Downloads passam por autorização no backend. Veja [supabase.md](supabase.md) para configuração completa.
 
 O POST `/api/uploads` requer consentimento e cria o registro; o cliente faz PUT dos bytes, chama `/complete` e depois envia thumbnail JPEG separada. Nenhuma transformação escreve sobre o original. As miniaturas são geradas no navegador para manter o upload do original independente de codecs. Falha na prévia é exibida, especialmente em HEIC.
 
@@ -63,4 +63,4 @@ A bridge deve primeiro validar a notificação original do gateway. O servidor v
 
 ## PostgreSQL
 
-O adapter Vercel utiliza o [SQL-over-HTTP do Neon](https://neon.com/docs/serverless/serverless-driver). Restringe o hostname ao serviço contratado, envia consultas parametrizadas, usa batch transacional Serializable e valida o formato da resposta. As tabelas e colunas preservam nomes entre D1 e PostgreSQL. Não foi executado contra banco remoto sem credenciais. Confira conexão, permissões, backups e o contrato HTTP na homologação.
+O adapter Vercel utiliza Postgres.js e aceita a URI PostgreSQL do Supabase (também compatível com outros provedores PostgreSQL). Para Vercel, use Supavisor Transaction pooler, `prepare: false`, pool de três conexões e TLS com verificação de certificado. Não há mais restrição ao host Neon nem chamada a uma bridge HTTP de SQL. Valores usam parâmetros; batches de negócio usam uma transação Serializable, com rollback e retries limitados a falhas de serialização/deadlock confirmadas. Contagens int8 são convertidas sem perda de precisão. A migration de privacidade habilita RLS e revoga permissões dos papéis de acesso direto, mantendo autorização na API da loja. O build Sites continua usando D1/R2 e não importa o driver TCP.

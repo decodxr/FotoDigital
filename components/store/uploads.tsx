@@ -26,7 +26,7 @@ catch {
     bitmap.close();
     throw Error('A imagem ultrapassa 120 megapixels. Fale com a loja para enviar este arquivo.');
 } const canvas = document.createElement('canvas'); const scale = Math.min(1, 600 / Math.max(width, height)); canvas.width = Math.max(1, Math.round(width * scale)); canvas.height = Math.max(1, Math.round(height * scale)); const ctx = canvas.getContext('2d')!; ctx.fillStyle = 'white'; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height); bitmap.close(); const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', .83)); return { width, height, blob }; }
-function transfer(url: string, file: File, onProgress: (n: number) => void) { return new Promise<void>((resolve, reject) => { const xhr = new XMLHttpRequest(); xhr.open('PUT', url); xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream'); xhr.upload.onprogress = e => { if (e.lengthComputable)
+function transfer(url: string, file: File, mime: string, onProgress: (n: number) => void) { return new Promise<void>((resolve, reject) => { const xhr = new XMLHttpRequest(); xhr.open('PUT', url); xhr.setRequestHeader('Content-Type', mime); xhr.upload.onprogress = e => { if (e.lengthComputable)
     onProgress(Math.round(e.loaded / e.total * 90)); }; xhr.onload = () => xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(Error('O envio foi interrompido. Tente novamente.')); xhr.onerror = () => reject(Error('Sem conexão. Seu arquivo pode ser reenviado.')); xhr.ontimeout = () => reject(Error('O envio demorou mais do que o esperado. Tente novamente.')); xhr.timeout = 600000; xhr.send(file); }); }
 export function UploadZone({ onUploaded, documents = false, multiple = true }: {
     onUploaded: (photo: Photo) => void;
@@ -49,7 +49,7 @@ export function UploadZone({ onUploaded, documents = false, multiple = true }: {
         setTasks(t => t.map(x => x.id === id ? { ...x, ...change } : x)); };
     const run = useCallback(async function processQueue() { if (active.current >= 2 || !queue.current.length)
         return; const task = queue.current.shift()!; active.current++; void processQueue(); try {
-        const mime = task.file.type === 'image/heif' ? 'image/heic' : task.file.type || (/\.heic$/i.test(task.file.name) ? 'image/heic' : /\.jpe?g$/i.test(task.file.name) ? 'image/jpeg' : /\.png$/i.test(task.file.name) ? 'image/png' : /\.pdf$/i.test(task.file.name) ? 'application/pdf' : '');
+        const mime = task.file.type === 'image/heif' ? 'image/heic' : task.file.type || (/\.hei[cf]$/i.test(task.file.name) ? 'image/heic' : /\.jpe?g$/i.test(task.file.name) ? 'image/jpeg' : /\.png$/i.test(task.file.name) ? 'image/png' : /\.pdf$/i.test(task.file.name) ? 'application/pdf' : '');
         if (!['image/jpeg', 'image/png', 'image/heic', ...(documents ? ['application/pdf'] : [])].includes(mime))
             throw Error('Formato não aceito. Use JPG, PNG' + (documents ? ' ou PDF.' : ' ou HEIC.'));
         if (task.file.size > catalog.settings.maxUploadMb * 1024 * 1024)
@@ -59,7 +59,7 @@ export function UploadZone({ onUploaded, documents = false, multiple = true }: {
             id: string;
             url: string;
         }>('uploads', 'POST', { name: task.file.name, mime, bytes: task.file.size, width: pre.width, height: pre.height, consent: true });
-        await transfer(result.url, task.file, n => patch(task.id, { progress: n }));
+        await transfer(result.url, task.file, mime, n => patch(task.id, { progress: n }));
         const photo = await api<Photo>('uploads/' + result.id + '/complete', 'POST', {});
         if (pre.blob) {
             const r = await fetch('/api/uploads/' + result.id + '/thumbnail', { method: 'PUT', headers: { 'Content-Type': 'image/jpeg' }, body: pre.blob });

@@ -1,2 +1,23 @@
-import {readFileSync,readdirSync} from 'node:fs';
-const connection=process.env.DATABASE_URL;if(!connection)throw Error('Defina DATABASE_URL. Nenhum banco remoto foi alterado.');const host=new URL(connection).hostname;if(!host.endsWith('.neon.tech'))throw Error('O adapter de implantação requer PostgreSQL Neon.');async function request(body){const r=await fetch('https://'+host+'/sql',{method:'POST',headers:{'Content-Type':'application/json','Neon-Connection-String':connection,'Neon-Raw-Text-Output':'false','Neon-Array-Mode':'false','Neon-Batch-Isolation-Level':'Serializable'},body:JSON.stringify(body)});if(!r.ok)throw Error('PostgreSQL recusou a migration. Confira conexão e permissões.');return r.json();}await request({query:'CREATE TABLE IF NOT EXISTS _migrations (id TEXT PRIMARY KEY)',params:[]});for(const f of readdirSync('db/postgres').filter(f=>f.endsWith('.sql')).sort()){const done=await request({query:'SELECT id FROM _migrations WHERE id=$1',params:[f]});if(done.rows.length)continue;const queries=readFileSync('db/postgres/'+f,'utf8').replace(/^--.*$/gm,'').split(';').map(q=>q.trim()).filter(Boolean).map(query=>({query,params:[]}));queries.push({query:'INSERT INTO _migrations(id) VALUES($1)',params:[f]});await request({queries});console.log('Aplicada:',f);}
+import { createPostgres } from '../lib/server/postgres.mjs';
+import { loadLocalEnv } from './load-local-env.mjs';
+import { setupSQL } from './postgres-migrations.mjs';
+import { databaseError } from './database-errors.mjs';
+
+loadLocalEnv();
+let sql;
+try {
+    const connection = process.env.DIRECT_URL || process.env.DATABASE_URL;
+    if (!connection) throw Error('missing_configuration');
+    sql = createPostgres(connection, { ca: process.env.DATABASE_CA_CERT, max: 1 });
+    // Execute the complete SQL: splitting on semicolons corrupts DO blocks.
+    // A transaction and advisory lock make repeated/concurrent runs safe.
+    await sql.unsafe(setupSQL()).simple();
+    const applied = await sql`SELECT id FROM public._migrations ORDER BY id`;
+    for (const { id } of applied) console.log('Migration aplicada:', id);
+    console.log('Esquema atualizado. Dados existentes foram preservados.');
+} catch (error) {
+    console.error(databaseError(error));
+    process.exitCode = 1;
+} finally {
+    if (sql) await sql.end({ timeout: 5 });
+}

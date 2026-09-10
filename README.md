@@ -10,13 +10,13 @@ O projeto reúne loja, revelação de fotos, documentos, personalizados, área d
 - Componentes por domínio em `components/store`. Editor e áreas secundárias são carregados separadamente.
 - APIs em `app/api/[...path]`, regras e autorização em `lib/server`, cálculos compartilhados em `lib/shared`.
 - Sites: build Vinext, Cloudflare Worker, banco D1 e bucket R2 privados provisionados pelos bindings `DB` e `BUCKET`.
-- Vercel: build Next.js nativo, adapter PostgreSQL Neon por HTTPS e armazenamento S3/R2 por URLs assinadas. Sem armazenamento permanente no filesystem.
-- Modelagem Drizzle com 28 tabelas, migrations SQL D1 e versão PostgreSQL. Não utiliza Prisma: os adapters evitam acoplar a aplicação a um engine incompatível com a hospedagem Sites. PostgreSQL preserva as mesmas entidades e regras.
+- Vercel: build Next.js nativo, PostgreSQL do Supabase via Supavisor e Supabase Storage pela API S3 privada. Consultas parametrizadas, pool limitado, TLS verificado e URLs de upload assinadas. Sem armazenamento permanente no filesystem. AWS S3/R2 continuam compatíveis com o adapter de objetos.
+- Modelagem Drizzle com 29 tabelas, migrations SQL D1 e versão PostgreSQL. Não utiliza Prisma: os adapters evitam acoplar a aplicação a um engine incompatível com a hospedagem Sites. PostgreSQL preserva as mesmas entidades e regras.
 - Variantes, campos configuráveis, endereços e snapshots são documentos JSON tipados/validados, sem blobs de imagens no banco. `users` reúne identidade e perfil do cliente; `uploads`/`photoConfigurations` representam arquivos e instruções de impressão.
 
 ## Identidade e movimento
 
-O visual utiliza superfícies com tom de papel, verde profundo e tipografia Newsreader/DM Sans hospedada no próprio site. A home combina fotografias, categorias visuais e conteúdo editorial. O padrão segue no catálogo, upload, checkout, conta e administração. Animações usam CSS e IntersectionObserver, sem dependência adicional; respeitam `prefers-reduced-motion`, mantêm o conteúdo disponível sem JavaScript e revelam elementos quando recebem foco pelo teclado.
+O visual utiliza superfícies brancas e cinza, controles em carvão, a abertura colorida da marca e tipografia DM Sans hospedada no próprio site. A home combina fotografias, categorias visuais e conteúdo editorial. O padrão segue no catálogo, upload, checkout, conta e administração. Animações usam CSS e IntersectionObserver, sem dependência adicional; respeitam `prefers-reduced-motion`, mantêm o conteúdo disponível sem JavaScript e revelam elementos quando recebem foco pelo teclado.
 
 ## Funcionalidades
 
@@ -41,7 +41,11 @@ npm run dev
 
 O seed é idempotente e executado no primeiro acesso ao catálogo. O registro `settings/store` marca a inicialização; alterações administrativas não são sobrescritas. Para acrescentar novos dados a uma loja existente, crie uma migration/rotina explícita ou utilize o painel.
 
-Para desenvolver no ambiente Vercel/Neon, configure `DATABASE_URL` e o storage, aplique as migrations PostgreSQL e execute `npx next dev`.
+Para desenvolver com Supabase, siga [o guia completo de configuração](docs/supabase.md), configure `.env.local`, aplique o SQL e execute `npm run dev:vercel`. Esse é o comando Next.js que usa o Supabase; `npm run dev` continua reservado ao Sites.
+
+## Supabase
+
+Veja [docs/supabase.md](docs/supabase.md) para todos os passos, variáveis, diagnóstico e solução de erros. O instalador completo está em [supabase/setup.sql](supabase/setup.sql). A autenticação permanece no aplicativo: usuários e sessões ficam no PostgreSQL, sem dependência de Supabase Auth.
 
 ## Primeiro administrador
 
@@ -70,13 +74,15 @@ No Sites, a identidade verificada da plataforma pode ser usada. `ADMIN_EMAILS` s
 ```bash
 npm run db:generate
 npm run db:migrate:local
-# Apenas ao preparar o esquema inicial equivalente do PostgreSQL:
-node scripts/generate-postgres.mjs
-# Com DATABASE_URL exportada no terminal:
+# Com DATABASE_URL (ou DIRECT_URL) em .env.local:
 npm run db:migrate:postgres
+# Gerar o instalador para copiar no SQL Editor do Supabase:
+npm run supabase:sql
+# Verificar a conexão configurada sem alterar dados:
+npm run supabase:check
 ```
 
-Não regenere/substitua migrations já aplicadas. O SQL inicial PostgreSQL é consolidado e ordena as chaves estrangeiras; alterações futuras exigem migrations incrementais para **ambos** os bancos. `migrate-postgres.mjs` aplica arquivos SQL em transações por arquivo. Este projeto não recebeu credenciais PostgreSQL; sua execução remota depende da conta de implantação.
+Não regenere/substitua migrations já aplicadas. O SQL inicial PostgreSQL é consolidado e ordena as chaves estrangeiras; alterações futuras nas entidades exigem migrations incrementais para **ambos** os bancos. A migration PostgreSQL de RLS é exclusiva desse provedor. `migrate-postgres.mjs` aplica migrations pendentes numa transação com trava, sem dividir blocos SQL por ponto e vírgula. `supabase/setup.sql` é gerado dos mesmos arquivos e pode ser reexecutado. O utilitário antigo `generate-postgres.mjs` foi usado somente na criação inicial: não o execute sobre o histórico aplicado. Este projeto não recebeu credenciais Supabase; a execução remota depende da sua configuração.
 
 ## Arquivos, privacidade e segurança
 
@@ -96,8 +102,8 @@ A máquina Rede física não cria uma integração de cartão online. Cartões s
 
 1. Importe `decodxr/FotoDigital` na Vercel, framework Next.js, Node 24.
 2. `vercel.json` já seleciona `npm run build:vercel` (`next build --webpack`). O comando `npm run build` é reservado ao Worker Sites.
-3. Conecte PostgreSQL Neon, configure `DATABASE_URL` com TLS e aplique `npm run db:migrate:postgres` no ambiente autorizado.
-4. Configure bucket privado, credenciais S3/R2 e CORS para upload PUT a partir do domínio real.
+3. Siga [docs/supabase.md](docs/supabase.md): instale `supabase/setup.sql` pelo SQL Editor e configure `DATABASE_URL` com a URI do Transaction pooler.
+4. Crie o bucket privado no Supabase e configure as credenciais da API S3, incluindo endpoint completo e região. Execute `npm run supabase:check -- --write-test` no ambiente configurado.
 5. Configure `APP_URL` com o domínio HTTPS, a chave PIX e o código inicial do administrador.
 6. Faça o deploy. Execute uma compra de homologação com produtos/preços autorizados e credenciais de teste dos provedores antes da abertura ao público.
 
@@ -105,7 +111,7 @@ Não exponha chaves em variáveis `NEXT_PUBLIC_*`. Não copie headers de identid
 
 ## Sites
 
-A identidade existente está em `.openai/hosting.json`. Reutilize o `project_id`; não crie outra aplicação ao atualizar. O build leva código, assets e migrations em `dist/`. Variáveis de produção são mantidas pelo serviço Sites. Publique sempre uma versão cujo commit tenha sido enviado ao repositório de origem. A primeira publicação é privada para revisão do proprietário; ela não torna a loja pública nem altera permissões de acesso.
+A identidade existente está em `.openai/hosting.json`. Reutilize o `project_id`; não crie outra aplicação ao atualizar. O build leva código, assets e migrations em `dist/`. Variáveis de produção são mantidas pelo serviço Sites. Publique sempre uma versão cujo commit tenha sido enviado ao repositório de origem. As atualizações preservam o acesso já configurado para este Site. Seus dados D1/R2 não são transferidos automaticamente para Supabase; a versão Vercel possui banco, arquivos e autenticação próprios.
 
 ## Verificação
 
@@ -118,7 +124,7 @@ npm run build
 npm run build:vercel
 ```
 
-Os testes exercitam cálculos de DPI, preços e PIX, documentos, identidade, autorização entre clientes, bootstrap, arquivos originais, checkout persistente, idempotência, ZIP, estados e disputa de estoque. O teste opcional `node tests/worker.test.mjs` exercita o bundle compilado com Miniflare/D1/R2; sua execução requer permissão para abrir o runtime local e não foi concluída neste ambiente. O adapter SQLite/Map usado nos testes é explicitamente isolado em `tests/platform.ts`; não integra o bundle de produção. Integrações externas exigem homologação com credenciais reais e testes de dispositivos/fluxos no domínio escolhido.
+Os testes exercitam cálculos de DPI, preços e PIX, documentos, identidade, autorização entre clientes, bootstrap, arquivos originais, checkout persistente, idempotência, ZIP, estados e disputa de estoque. O fluxo da API é executado em SQLite e no motor PostgreSQL/PGlite. Também são verificados instalação repetida do SQL, RLS, bloqueio para anon/authenticated, rollback, parâmetros, configuração do pool e assinatura S3 com o prefixo Supabase. O teste opcional `node tests/worker.test.mjs` exercita o bundle compilado com Miniflare/D1/R2; sua execução requer permissão para abrir o runtime local e não foi concluída neste ambiente. O adapter SQLite/Map usado nos testes é explicitamente isolado em `tests/platform.ts`; não integra o bundle de produção. Integrações externas exigem homologação com credenciais reais e testes de dispositivos/fluxos no domínio escolhido.
 
 ## Imagens e conteúdo
 

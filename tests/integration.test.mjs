@@ -3,10 +3,12 @@ import assert from 'node:assert/strict';
 import {createServer} from 'vite';
 import {resolve} from 'node:path';
 import {PDFDocument} from 'pdf-lib';
-test('Commerce API: identity, originals, PDF pages, checkout, ZIP and concurrency',async()=>{
- const loader=await createServer({configFile:false,root:process.cwd(),server:{middlewareMode:true},appType:'custom',resolve:{alias:[{find:'@/lib/server/platform',replacement:resolve('tests/platform.ts')},{find:'@',replacement:process.cwd()}]}});
+for (const adapter of ['platform', 'platform-postgres']) test('Commerce API (' + adapter + '): identity, originals, PDF pages, checkout, ZIP and concurrency',async()=>{
+ let databaseAdapter;
+ const loader=await createServer({configFile:false,root:process.cwd(),server:{middlewareMode:true},appType:'custom',resolve:{alias:[{find:'@/lib/server/platform',replacement:resolve('tests/' + adapter + '.ts')},{find:'@',replacement:process.cwd()}]}});
  try{
- const {handleApi}=await loader.ssrLoadModule('/lib/server/api.ts');const {shippingItems}=await loader.ssrLoadModule('/lib/server/cart.ts');const platform=await loader.ssrLoadModule('/tests/platform.ts');
+ const {handleApi}=await loader.ssrLoadModule('/lib/server/api.ts');const {shippingItems}=await loader.ssrLoadModule('/lib/server/cart.ts');const platform=await loader.ssrLoadModule('/tests/' + adapter + '.ts');
+ databaseAdapter = platform;
  const base='https://fotodigital.test';
  function client(){let cookie='';return {async call(path,method='GET',body,extra={}){const headers={origin:base,cookie,...extra};if(body&&!(body instanceof Uint8Array)){headers['content-type']='application/json';body=JSON.stringify(body);}const req=new Request(base+'/api/'+path,{method,headers,body,duplex:'half'});const r=await handleApi(req,path.split('/'));const set=r.headers.getSetCookie();for(const c of set){const item=c.split(';')[0],name=item.split('=')[0];cookie=cookie.split('; ').filter(x=>x&&!x.startsWith(name+'=')).concat(item).join('; ');}return r;}};}
  const a=client(),b=client(),admin=client();
@@ -55,6 +57,7 @@ test('Commerce API: identity, originals, PDF pages, checkout, ZIP and concurrenc
  const ca=await (await a.call('cart')).json();for(const i of ca.items)await a.call('cart/'+i.id,'DELETE');
  for(const c of [a,b])assert.equal((await c.call('cart','POST',{productId:product.id,quantity:1,fields:{},photos:[]})).status,200);
  const results=await Promise.all([a.call('orders','POST',{...checkout,idempotencyKey:crypto.randomUUID()}),b.call('orders','POST',{...checkout,idempotencyKey:crypto.randomUUID()})]);assert.deepEqual(results.map(r=>r.status).sort(),[201,409]);
- assert.equal((await platform.query('PRAGMA foreign_key_check')).length,0);
- }finally{await loader.close();}
+ if (adapter === 'platform') assert.equal((await platform.query('PRAGMA foreign_key_check')).length,0);
+ else assert.equal((await platform.query('SELECT COUNT(*) AS count FROM users'))[0].count,3);
+ }finally{await databaseAdapter?.close();await loader.close();}
 });
