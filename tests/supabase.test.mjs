@@ -50,7 +50,8 @@ test('Supavisor uses a bounded pool without prepared statements and verifies TLS
     const client = createPostgres('postgresql://postgres.example:test-only@aws-0-test.pooler.supabase.com:6543/postgres?sslmode=require');
     try {
         assert.equal(client.options.prepare, false);
-        assert.equal(client.options.max, 3);
+        assert.equal(client.options.max, 1);
+        assert.equal(client.options.fetch_types, false);
         assert.equal(client.options.ssl.rejectUnauthorized, true);
         assert.equal(client.options.connect_timeout, 10);
     } finally { await client.end(); }

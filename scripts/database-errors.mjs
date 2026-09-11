@@ -12,6 +12,8 @@ export function databaseError(error) {
         ENETUNREACH: 'Rede inacessível. Use o pooler Session (5432) ou Transaction (6543), compatível com IPv4.',
         ECONNREFUSED: 'Conexão recusada. Confira se o projeto está ativo e a porta pertence ao pooler selecionado.',
         CONNECT_TIMEOUT: 'Tempo de conexão excedido. Confira o projeto, host, porta e restrições de rede.',
+        DATABASE_TIMEOUT: 'A operação no banco excedeu o prazo. Confira os logs database_operation_failed e o estado do projeto Supabase.',
+        '57014': 'O PostgreSQL cancelou uma consulta por timeout. Confira consultas bloqueadas e statement_timeout no Supabase.',
         CONNECTION_CLOSED: 'Conexão encerrada. Confira o estado do projeto e tente novamente.',
         '53300': 'Limite de conexões atingido. Use o Transaction pooler em DATABASE_URL.',
         SELF_SIGNED_CERT_IN_CHAIN: 'Configure DATABASE_CA_CERT com o certificado CA do projeto. A verificação TLS continua obrigatória.',

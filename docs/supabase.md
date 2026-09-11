@@ -82,6 +82,12 @@ Use o host real copiado do seu painel, sem inventar a região ou o número do se
 
 A versão Vercel usa um pool pequeno e `prepare: false`, compatível com o Supavisor em modo Transaction. A validação TLS é obrigatória.
 
+O pool usa uma conexão por instância. A aplicação desativa `fetch_types` porque suas listas são armazenadas como JSON em campos de texto; não utiliza arrays nativos do PostgreSQL. Isso evita a consulta automática a `pg_type` na inicialização do driver. Uma falha nessa consulta interna pode gerar uma rejeição não tratada antes de o aplicativo receber o resultado.
+
+Na Vercel, cada consulta tem prazo de 8 segundos, incluindo a fila do pool; transações têm prazo total de 25 segundos. Ao exceder o prazo, a aplicação descarta o pool e registra `database_operation_failed` com etapa, tabela/operação, código e duração, sem parâmetros ou credenciais. Conexões ociosas por mais de 5 segundos são renovadas antes de um novo trabalho para evitar sockets parados após a suspensão da função. Operações de escrita com resultado incerto não são repetidas automaticamente. As únicas repetições de transações continuam sendo para rollback confirmado por serialização/deadlock.
+
+O carregamento público do catálogo tem prazo total de 12 segundos e, durante falhas, mostra o aviso de indisponibilidade já existente. Esse fallback não confirma que compras e cadastro estão funcionando. Metadata e página compartilham a leitura durante a renderização; a instalação inicial do catálogo também é compartilhada entre chamadas concorrentes da mesma instância.
+
 Para migrations, você pode preencher `DIRECT_URL` com a URI do **Session pooler**, normalmente na porta **5432**. A conexão direta `db.<project-ref>.supabase.co:5432` pode exigir IPv6; o Session pooler é uma alternativa quando sua rede só possui IPv4.
 
 Se houver erro de certificado, copie o certificado CA do projeto para `DATABASE_CA_CERT`, em formato PEM completo. Essa variável aceita quebras de linha reais ou `\n`. Não desative a verificação TLS.
@@ -184,6 +190,9 @@ Defina a retenção no administrador. A rotina **Limpar arquivos expirados** exc
 | `password authentication failed` | Senha do banco, usuário completo e codificação de caracteres especiais na URI. |
 | `Tenant or user not found` | Host e usuário copiados de Connect; o pooler normalmente usa `postgres.<project-ref>`. |
 | Erro IPv6 ou timeout | Use o pooler compatível com IPv4 e confira se o projeto está ativo. |
+| `self-signed certificate in certificate chain` | Em Database Settings → SSL Configuration, baixe o certificado CA e cole todo o PEM em `DATABASE_CA_CERT`, incluindo BEGIN/END. Salve em Production e faça Redeploy. |
+| Página presa / timeout de 300 segundos | Confirme o deploy da correção de consultas limitadas. Consulte `database_operation_failed`, filtrando pelo deploy atual. |
+| `57014` / `canceling statement due to statement timeout` | A conexão chegou ao PostgreSQL. Confira a etapa/tabela indicada no log, consultas bloqueadas, saúde do banco e `statement_timeout`. Não desative a verificação SSL. |
 | `relation ... does not exist` | Execute o instalador inteiro no banco correto. |
 | `relation ... already exists` sem migration registrada | Não apague tabelas; revise o esquema de uma tentativa anterior e o histórico `_migrations`. |
 | `permission denied` no backend | Use a conexão do proprietário das tabelas ou papel com BYPASSRLS, exclusivamente no servidor. |

@@ -2,6 +2,8 @@ import type { Catalog, Category, Field, PrintSize, Product, Service, StoreSettin
 import { insert, json, one, query, transaction } from './db';
 import { photos } from '@/lib/shared/images';
 import { ensureShowcaseSeed } from './showcase';
+import { cache } from 'react';
+import { DeadlineError, withinDeadline } from './deadline';
 export { photos } from '@/lib/shared/images';
 export const defaultSettings: StoreSettings = { pixDiscount: 5, pixEnabled: true, retentionDays: 90, maxUploadMb: 25, maxPhotos: 200, documentBw: null, documentColor: null, documentDuplex: false, photoSheetCount: 8, polaroidCaption: true, installments: 1, installmentText: 'Parcelamento disponível com juros conforme condições da operadora.', storeOpen: true, shippingNotice: 'Consulte a disponibilidade de envio para o seu CEP.' };
 const photoField: Field = { key: 'photo', label: 'Envie sua foto', type: 'photo', required: true };
@@ -46,7 +48,12 @@ export const seedSizes: PrintSize[] = [[10, 15], [13, 18], [15, 21], [20, 25], [
 seedSizes.push({ id: 'polaroid-ima', name: 'Polaroid com ímã 9 × 11 cm', width: 9, height: 11, price: null, active: 1, finishes: ['Brilhante', 'Fosco'], tiers: [] });
 export const seedServices: Service[] = [['corporativo', 'Ensaio corporativo', photos.corporate, 'Mostre quem está por trás do seu trabalho. Retratos para LinkedIn, currículo, redes sociais e equipes.'], ['feminino', 'Ensaio feminino', photos.woman, 'Um tempo para você. Um ensaio acolhedor, com direção e cuidado para registrar a sua essência.'], ['infantil', 'Ensaio infantil', photos.child, 'A infância acontece depressa. Guarde as descobertas, os sorrisos e o jeitinho de cada fase.'], ['eventos', 'Eventos fotográficos', photos.prints, 'A emoção de um encontro, registrada com atenção aos detalhes e às pessoas.'], ['estudio', 'Ensaios em estúdio', photos.woman, 'Luz, direção e um ambiente preparado para contar a sua história.']].map(([slug, name, image, description]) => ({ id: slug, slug, name, image, description, gallery: [image], active: 1, faq: [{ question: 'Como agendar?', answer: 'Fale com a nossa equipe pelo WhatsApp para consultar datas e receber uma proposta.' }, { question: 'Preciso saber posar?', answer: 'Você recebe orientação durante o ensaio. Vamos construir as fotos juntos, respeitando o seu ritmo.' }] }));
 let seeded = false;
+let seeding: Promise<void> | undefined;
 export async function ensureSeed() {
+    if (seeded) return;
+    return seeding ??= seedStore().finally(() => { seeding = undefined; });
+}
+async function seedStore() {
     if (seeded)
         return;
     const exists = await one<{
@@ -77,10 +84,10 @@ export async function catalog(): Promise<Catalog> { await ensureSeed(); await en
         id: string;
         available: number;
     }>('SELECT id,available FROM inventory'), query<Catalog['banners'][number]>('SELECT id,title,subtitle,image,link,"sortOrder",illustrative FROM banners WHERE active=1 ORDER BY "sortOrder",id LIMIT 8')]); return { products: products.map(r => { const p = productRow(r); return { ...p, variants: p.variants.map(v => ({ ...v, stock: v.stock === null ? null : inventory.find(i => i.id === p.id + ':' + v.id)?.available ?? 0 })) }; }), categories, sizes: sizes.map(s => ({ ...s, finishes: json(s.finishes, []), tiers: json(s.tiers, []) } as unknown as PrintSize)), services: services.map(s => ({ ...s, gallery: json(s.gallery, []), faq: json(s.faq, []) } as unknown as Service)), testimonials, settings, banners }; }
-export async function safeCatalog(): Promise<Catalog> { try {
-    return await catalog();
+export const safeCatalog = cache(async (): Promise<Catalog> => { try {
+    return await withinDeadline(catalog(), 12000, new DeadlineError('CATALOG_TIMEOUT', 'A consulta do catálogo excedeu o prazo de 12 segundos.'));
 }
 catch (error) {
     console.error('catalog_unavailable', error instanceof Error ? error.message : 'unknown');
     return { products: seedProducts, categories: seedCategories, sizes: seedSizes, services: seedServices, testimonials: [], banners: [], settings: defaultSettings, unavailable: true };
-} }
+} });

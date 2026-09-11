@@ -11,7 +11,12 @@ export const initialShowcase: Catalog['banners'] = [
 ];
 
 let initialized = false;
+let initializing: Promise<void> | undefined;
 export async function ensureShowcaseSeed() {
+    if (initialized) return;
+    return initializing ??= seedShowcase().finally(() => { initializing = undefined; });
+}
+async function seedShowcase() {
     if (initialized) return;
     if (await one('SELECT id FROM settings WHERE id=?', ['showcase-initialized'])) {
         initialized = true;
