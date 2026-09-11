@@ -12,7 +12,7 @@ const connectionErrors = new Set(['DATABASE_TIMEOUT', 'CONNECT_TIMEOUT', 'CONNEC
 
 /** Bound the complete operation, including time spent waiting in the pool. */
 export function createDatabaseRuntime<C extends Connection>(create: () => C, limits: Limits = {}) {
-    type Entry = { client: C; pending: number; lastFinished: number; closed: boolean };
+    type Entry = { client: C; pending: number; lastFinished: number; closed: boolean; tail: Promise<void> };
     let current: Entry | undefined;
 
     function discard(entry: Entry) {
@@ -28,12 +28,19 @@ export function createDatabaseRuntime<C extends Connection>(create: () => C, lim
             // Serverless suspension can leave a socket stale while its idle timer
             // is frozen. Recycle idle pools before work, never an active transaction.
             if (current && current.pending === 0 && Date.now() - current.lastFinished > (limits.idleMs ?? 5000)) discard(current);
-            const entry = current ??= { client: create(), pending: 0, lastFinished: Date.now(), closed: false };
+            const entry = current ??= { client: create(), pending: 0, lastFinished: Date.now(), closed: false, tail: Promise.resolve() };
             entry.pending++;
             const started = Date.now();
+            // Serialize whole operations, including BEGIN through COMMIT/ROLLBACK.
+            // No unrelated query may enter a transaction or be pipelined behind it.
+            const task = entry.tail.then(() => {
+                if (entry.closed) throw new DeadlineError('CONNECTION_DESTROYED', 'A conexão do banco foi encerrada.');
+                return action(entry.client);
+            });
+            entry.tail = task.then(() => {}, () => {});
             try {
                 const timeout = phase === 'transaction' ? (limits.transactionMs ?? 25000) : (limits.queryMs ?? 8000);
-                return await withinDeadline(action(entry.client), timeout,
+                return await withinDeadline(task, timeout,
                     new DeadlineError('DATABASE_TIMEOUT', 'O banco de dados não respondeu dentro do prazo.'), () => discard(entry));
             } catch (error) {
                 const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : 'UNKNOWN';

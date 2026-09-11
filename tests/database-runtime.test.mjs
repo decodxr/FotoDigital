@@ -59,14 +59,34 @@ test('Idle pools are recycled after suspension, while active transactions keep t
     let finish;
     const transaction = runtime.run('transaction', '1 statement', () => new Promise(resolve => { finish = resolve; }));
     await delay(5);
-    await runtime.run('query', 'SELECT:settings', async () => []);
+    let readStarted = false;
+    const read = runtime.run('query', 'SELECT:settings', async () => { readStarted = true; return []; });
+    await delay(1);
     assert.equal(pool.entries.length, 1);
     assert.equal(pool.entries[0].closed, false);
+    assert.equal(readStarted, false, 'An unrelated read cannot run inside the active transaction');
     finish('committed');
     assert.equal(await transaction, 'committed');
+    await read;
+    assert.equal(readStarted, true);
     await delay(5);
     await runtime.run('query', 'SELECT:settings', async () => []);
     assert.equal(pool.entries.length, 2);
+    assert.equal(pool.entries[0].closed, true);
+});
+
+test('Queued writes are never started after their connection deadline expires', async t => {
+    t.mock.method(console, 'error', () => {});
+    const pool = connections();
+    const runtime = createDatabaseRuntime(pool.create, { queryMs: 15, transactionMs: 1000 });
+    let finish;
+    const active = runtime.run('transaction', '1 statement', () => new Promise(resolve => { finish = resolve; }));
+    let writes = 0;
+    await assert.rejects(runtime.run('query', 'INSERT:users', async () => { writes++; }), { code: 'DATABASE_TIMEOUT' });
+    finish('finished');
+    await active;
+    await delay(0);
+    assert.equal(writes, 0);
     assert.equal(pool.entries[0].closed, true);
 });
 

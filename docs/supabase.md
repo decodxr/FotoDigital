@@ -82,7 +82,9 @@ Use o host real copiado do seu painel, sem inventar a região ou o número do se
 
 A versão Vercel usa um pool pequeno e `prepare: false`, compatível com o Supavisor em modo Transaction. A validação TLS é obrigatória.
 
-O pool usa uma conexão por instância e `max_pipeline: 0`. Chamadas concorrentes aguardam na fila do driver; uma nova consulta só é enviada depois que a anterior termina. Isso evita respostas perdidas no Supavisor quando várias transações implícitas são enviadas pelo mesmo socket. No Postgres.js 3.4.9, `max_pipeline: 1` ainda permite uma consulta adicional além da ativa, por isso o valor precisa ser zero.
+O pool usa uma conexão por instância e `max_pipeline: 1`. A aplicação mantém uma fila de operações em `postgres-runtime.ts`: uma consulta ou transação só começa depois que a operação anterior termina. A fila inclui a transação inteira, de BEGIN até COMMIT/ROLLBACK, impedindo consultas sobrepostas e leituras de outro pedido dentro de uma transação em andamento.
+
+Não use `max_pipeline: 0`. No Postgres.js 3.4.9, zero impede a execução do callback interno que reserva a conexão da transação; isso provoca `Cannot set properties of undefined (setting 'onclose')` e uma segunda rejeição envolvendo `queue`. Apenas aumentar esse número não basta: a fila da aplicação é que impede o pipeline no Supavisor. Os testes com TLS e o driver real cobrem criação de conta, carrinho, pedido, commit, rollback e chamadas concorrentes.
 
 A aplicação desativa `fetch_types` porque suas listas são armazenadas como JSON em campos de texto; não utiliza arrays nativos do PostgreSQL. Isso evita a consulta automática a `pg_type` na inicialização do driver. Uma falha nessa consulta interna pode gerar uma rejeição não tratada antes de o aplicativo receber o resultado.
 
@@ -194,7 +196,8 @@ Defina a retenção no administrador. A rotina **Limpar arquivos expirados** exc
 | Erro IPv6 ou timeout | Use o pooler compatível com IPv4 e confira se o projeto está ativo. |
 | `self-signed certificate in certificate chain` | Em Database Settings → SSL Configuration, baixe o certificado CA e cole todo o PEM em `DATABASE_CA_CERT`, incluindo BEGIN/END. Salve em Production e faça Redeploy. |
 | Página presa / timeout de 300 segundos | Confirme o deploy da correção de consultas limitadas. Consulte `database_operation_failed`, filtrando pelo deploy atual. |
-| Primeira consulta funciona, mas várias consultas do catálogo expiram | Confira se o deploy contém `max_pipeline: 0`; isso impede consultas sobrepostas no mesmo socket do Transaction pooler. Não remova o certificado para corrigir esse sintoma. |
+| Primeira consulta funciona, mas várias consultas do catálogo expiram | Confira se o deploy contém a fila de operações em `postgres-runtime.ts`. Ela impede consultas sobrepostas no mesmo socket do Transaction pooler. Não remova o certificado para corrigir esse sintoma. |
+| `Cannot set properties of undefined (setting 'onclose')` / erro em `queue` ao cadastrar ou abrir o carrinho | Publique a correção de transações, com `max_pipeline: 1` e a fila de operações. `max_pipeline: 0` é incompatível com a reserva de transações do driver. |
 | `57014` / `canceling statement due to statement timeout` | A conexão chegou ao PostgreSQL. Confira a etapa/tabela indicada no log, consultas bloqueadas, saúde do banco e `statement_timeout`. Não desative a verificação SSL. |
 | `relation ... does not exist` | Execute o instalador inteiro no banco correto. |
 | `relation ... already exists` sem migration registrada | Não apague tabelas; revise o esquema de uma tentativa anterior e o histórico `_migrations`. |
@@ -209,6 +212,7 @@ Defina a retenção no administrador. A rotina **Limpar arquivos expirados** exc
 ## Referências oficiais
 
 - [Supavisor: respostas perdidas em transações enviadas em pipeline](https://github.com/supabase/supavisor/issues/1061)
+- [Postgres.js: falha na reserva de conexão ao iniciar transações](https://github.com/porsager/postgres/issues/1189)
 - [Conexão PostgreSQL e poolers](https://supabase.com/docs/guides/database/connecting-to-postgres)
 - [Postgres.js no Supabase](https://supabase.com/docs/guides/database/postgres-js)
 - [Autenticação S3 e endpoint do Storage](https://supabase.com/docs/guides/storage/s3/authentication)

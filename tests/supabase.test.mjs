@@ -51,7 +51,7 @@ test('Supavisor uses a bounded pool without prepared statements and verifies TLS
     try {
         assert.equal(client.options.prepare, false);
         assert.equal(client.options.max, 1);
-        assert.equal(client.options.max_pipeline, 0);
+        assert.equal(client.options.max_pipeline, 1);
         assert.equal(client.options.fetch_types, false);
         assert.equal(client.options.ssl.rejectUnauthorized, true);
         assert.equal(client.options.connect_timeout, 10);

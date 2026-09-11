@@ -1,95 +1,47 @@
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
-import { createServer } from 'node:net';
-import { TLSSocket, createSecureContext } from 'node:tls';
-import { once } from 'node:events';
-import { execFileSync } from 'node:child_process';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { setTimeout as delay } from 'node:timers/promises';
-import { PGlite } from '@electric-sql/pglite';
-import { createPostgres } from '../lib/server/postgres.mjs';
+import { createServer } from 'vite';
+import { createServer as createHttpServer } from 'node:http';
+import { createPostgres, postgresTransaction } from '../lib/server/postgres.mjs';
+import { postgresWireServer } from './postgres-wire-server.mjs';
 
-function message(type, payload) {
-    const header = Buffer.alloc(5);
-    header[0] = type.charCodeAt(0);
-    header.writeInt32BE(payload.length + 4, 1);
-    return Buffer.concat([header, payload]);
-}
+const loader = await createServer({ configFile: false, server: { middlewareMode: true, hmr: { server: createHttpServer() }, watch: null }, appType: 'custom' });
+after(() => loader.close());
+const { createDatabaseRuntime } = await loader.ssrLoadModule('/lib/server/postgres-runtime.ts');
 
-// Local PostgreSQL wire endpoint backed by the real PGlite engine. It measures
-// queries sent before ReadyForQuery; SQL-only tests cannot catch this regression.
-test('Concurrent static and parameterized queries never overlap on the PostgreSQL socket', { timeout: 20000 }, async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'foto-digital-wire-'));
-    const db = new PGlite();
-    const sockets = new Set();
-    let server, client, failure;
-    let pending = 0, peak = 0;
+test('Real driver serializes concurrent reads and transactions, commits and rolls back without leaking work', { timeout: 20000 }, async () => {
+    const server = await postgresWireServer();
+    const client = createPostgres(server.connection, { ca: server.ca });
+    const database = createDatabaseRuntime(() => client);
+    const read = (sql, params = []) => database.run('query', 'test', connection => connection.unsafe(sql, params));
+    const write = statements => database.run('transaction', 'test', connection => postgresTransaction(connection, statements));
     try {
-        execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1',
-            '-subj', '/CN=localhost', '-addext', 'subjectAltName=DNS:localhost,IP:127.0.0.1',
-            '-keyout', join(directory, 'key.pem'), '-out', join(directory, 'cert.pem')], { stdio: 'ignore' });
-        const [key, cert] = await Promise.all(['key.pem', 'cert.pem'].map(file => readFile(join(directory, file))));
-        const secureContext = createSecureContext({ key, cert });
-        await db.waitReady;
-        server = createServer(socket => {
-            sockets.add(socket);
-            socket.once('data', request => {
-                assert.equal(request.readInt32BE(4), 80877103, 'TLS negotiation must remain enabled');
-                socket.write('S');
-                const tls = new TLSSocket(socket, { isServer: true, secureContext });
-                sockets.add(tls);
-                let startup = true, input = Buffer.alloc(0), batch = [], chain = Promise.resolve();
-                tls.on('error', error => { failure ??= error; });
-                tls.on('data', bytes => {
-                    input = Buffer.concat([input, bytes]);
-                    if (startup) {
-                        if (input.length < 4 || input.length < input.readInt32BE(0)) return;
-                        input = input.subarray(input.readInt32BE(0));
-                        startup = false;
-                        tls.write(Buffer.concat([message('R', Buffer.alloc(4)), message('Z', Buffer.from('I'))]));
-                    }
-                    while (input.length >= 5 && input.length >= input.readInt32BE(1) + 1) {
-                        const frame = input.subarray(0, input.readInt32BE(1) + 1);
-                        input = input.subarray(frame.length);
-                        const type = String.fromCharCode(frame[0]);
-                        if (type === 'X') { tls.end(); return; }
-                        if (type === 'Q' || type === 'P') peak = Math.max(peak, ++pending);
-                        batch.push(frame);
-                        if (!['Q', 'H', 'S'].includes(type)) continue;
-                        const request = Buffer.concat(batch);
-                        batch = [];
-                        chain = chain.then(async () => {
-                            // Allow pipelined input to arrive before sending the
-                            // reply, as happens across the production network.
-                            await delay(3);
-                            const reply = Buffer.from(await db.execProtocolRaw(request));
-                            for (let offset = 0; offset < reply.length; offset += reply.readInt32BE(offset + 1) + 1) {
-                                if (reply[offset] === 90) pending--; // ReadyForQuery
-                            }
-                            tls.write(reply);
-                        }).catch(error => { failure ??= error; tls.destroy(); });
-                    }
-                });
-            });
-        });
-        server.listen(0, '127.0.0.1');
-        await once(server, 'listening');
-        client = createPostgres(`postgresql://test:local-only@127.0.0.1:${server.address().port}/postgres`, { ca: cert.toString() });
-        await client.unsafe('SELECT -1 AS value');
+        // First operation on a cold connection is a transaction, like an empty cart.
+        const writes = await write([{ sql: 'CREATE TABLE test_transaction (id integer PRIMARY KEY)' }, { sql: 'INSERT INTO test_transaction (id) VALUES (?)', params: [1] }]);
+        assert.equal(writes[1].changes, 1);
+        assert.equal((await read('SELECT id FROM test_transaction'))[0].id, 1);
         const results = await Promise.all(Array.from({ length: 20 }, (_, index) => index % 2
-            ? client.unsafe('SELECT $1::integer AS value', [index])
-            : client.unsafe(`SELECT ${index} AS value`)));
-        assert.ifError(failure);
+            ? read('SELECT $1::integer AS value', [index])
+            : read(`SELECT ${index} AS value`)));
         assert.deepEqual(results.map(rows => rows[0].value), Array.from({ length: 20 }, (_, index) => index));
-        assert.equal(peak, 1, 'A second query must wait for ReadyForQuery from the first');
-        assert.equal(pending, 0);
+        const concurrent = await Promise.all([
+            read('SELECT COUNT(*) AS count FROM test_transaction'),
+            write([{ sql: 'INSERT INTO test_transaction (id) VALUES (?)', params: [2] }]),
+            read('SELECT COUNT(*) AS count FROM test_transaction'),
+        ]);
+        assert.equal(concurrent[0][0].count, 1);
+        assert.equal(concurrent[2][0].count, 2);
+        await assert.rejects(write([
+            { sql: 'INSERT INTO test_transaction (id) VALUES (?)', params: [3] },
+            { sql: 'INSERT INTO test_transaction (id) VALUES (?)', params: [1] },
+        ]), { code: '23505' });
+        assert.deepEqual((await read('SELECT id FROM test_transaction ORDER BY id')).map(row => row.id), [1, 2]);
+        const stats = server.stats();
+        assert.ifError(stats.failure);
+        assert.equal(stats.peak, 1, 'A second query must wait for ReadyForQuery from the first');
+        assert.equal(stats.pending, 0);
     } finally {
-        await client?.end({ timeout: 0 });
-        for (const socket of sockets) socket.destroy();
-        if (server?.listening) await new Promise(resolve => server.close(resolve));
-        await db.close();
-        await rm(directory, { recursive: true, force: true });
+        await client.end({ timeout: 0 });
+        await server.close();
     }
 });

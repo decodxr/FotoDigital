@@ -4,7 +4,7 @@ import {createServer} from 'vite';
 import {resolve} from 'node:path';
 import {PDFDocument} from 'pdf-lib';
 import {createServer as createHttpServer} from 'node:http';
-for (const adapter of ['platform', 'platform-postgres']) test('Commerce API (' + adapter + '): identity, originals, PDF pages, checkout, ZIP and concurrency',async()=>{
+for (const adapter of ['platform', 'platform-postgres', 'platform-wire']) test('Commerce API (' + adapter + '): identity, originals, PDF pages, checkout, ZIP and concurrency',async()=>{
  let databaseAdapter;
  const loader=await createServer({configFile:false,root:process.cwd(),server:{middlewareMode:true,hmr:{server:createHttpServer()},watch:null},appType:'custom',resolve:{alias:[{find:'@/lib/server/platform',replacement:resolve('tests/' + adapter + '.ts')},{find:'@',replacement:process.cwd()}]}});
  try{
@@ -14,7 +14,11 @@ for (const adapter of ['platform', 'platform-postgres']) test('Commerce API (' +
  function client(){let cookie='';return {async call(path,method='GET',body,extra={}){const headers={origin:base,cookie,...extra};if(body&&!(body instanceof Uint8Array)){headers['content-type']='application/json';body=JSON.stringify(body);}const req=new Request(base+'/api/'+path,{method,headers,body,duplex:'half'});const r=await handleApi(req,path.split('/'));const set=r.headers.getSetCookie();for(const c of set){const item=c.split(';')[0],name=item.split('=')[0];cookie=cookie.split('; ').filter(x=>x&&!x.startsWith(name+'=')).concat(item).join('; ');}return r;}};}
  const a=client(),b=client(),admin=client();
  const initialLoads=await Promise.all([a.call('catalog'),b.call('catalog'),admin.call('catalog')]);for(const response of initialLoads)assert.equal(response.status,200);let r=initialLoads[0];const initial=await r.json();assert.equal(initial.products.every(p=>p.price===null),true);assert.equal(initial.testimonials.length,0);
- for(const [c,email] of [[a,'a@test.example'],[b,'b@test.example'],[admin,'admin@test.example']]){await c.call('session');r=await c.call('auth/register','POST',{name:'Pessoa de teste',email,password:'test-only-password-123'});assert.equal(r.status,200,await r.text());}
+ for(const [c,email] of [[a,'a@test.example'],[b,'b@test.example'],[admin,'admin@test.example']]){await c.call('session');const guestCart=await c.call('cart');assert.equal(guestCart.status,200,await guestCart.clone().text());r=await c.call('auth/register','POST',{name:'Pessoa de teste',email,password:'test-only-password-123'});assert.equal(r.status,200,await r.text());}
+ assert.equal((await a.call('auth/logout','POST')).status,200);
+ assert.equal((await (await a.call('session')).json()).user,null);
+ assert.equal((await a.call('auth/login','POST',{email:'a@test.example',password:'test-only-password-123'})).status,200);
+ assert.equal((await (await a.call('session')).json()).user.email,'a@test.example');
  assert.equal((await a.call('admin/dashboard')).status,403);
  assert.equal((await admin.call('admin/bootstrap','POST',{token:'test-only-bootstrap-code-1234567890'})).status,200);
  assert.equal((await b.call('admin/bootstrap','POST',{token:'test-only-bootstrap-code-1234567890'})).status,409);
