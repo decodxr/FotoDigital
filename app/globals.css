@@ -4,6 +4,8 @@
 @import "../vendor/shadcn-tailwind-4.13.0.css";
 @import "./experience.css";
 @import "./showcase.css";
+@import "./camera-story.css";
+@import "./camera-loading.css";
 
 @utility scrollbar-thin {
   scrollbar-width: thin;

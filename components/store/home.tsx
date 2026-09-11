@@ -1,11 +1,17 @@
 'use client';
 
 import { ArrowRight, ArrowUpRight, Camera, Gift, ImageIcon, MapPin, Printer, Star, Truck } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useStore } from './context';
 import { PhotoImage } from './media';
 import { ProductCard } from './ui';
 import { PhotoShowcase } from './showcase';
+
+const CameraStory = dynamic(() => import('./camera-story').then(module => module.CameraStory), {
+    ssr: false,
+    loading: () => <div className="camera-story-loading" aria-label="Carregando experiência fotográfica"><span /></div>,
+});
 
 const images = {
     memories: 'https://images.pexels.com/photos/7015070/pexels-photo-7015070.jpeg?auto=compress&cs=tinysrgb&w=1400',
@@ -32,6 +38,8 @@ export function Home() {
             <div><Truck strokeWidth={1.4} /><span><strong>Retire ou receba</strong>Do nosso cuidado para sua casa</span></div>
             <div><span className="pix-percent">5%</span><span><strong>Desconto no PIX</strong>Mais motivos para revelar</span></div>
         </div></section>
+
+        <CameraStory />
 
         <section className="section container creation-section">
             <div className="section-heading" data-reveal><div><span className="eyebrow">PARA CADA JEITO DE GUARDAR</span><h2>O que você quer guardar?</h2></div><Link className="text-link" href="/loja">Conheça todas as possibilidades <ArrowRight size={18} /></Link></div>

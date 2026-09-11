@@ -1,0 +1,22 @@
+.camera-story-loading {
+    height: 100svh;
+    min-height: 680px;
+    background: #111211;
+    display: grid;
+    place-items: center;
+}
+
+.camera-story-loading span {
+    width: 32px;
+    height: 32px;
+    border: 1px solid #545552;
+    border-top-color: #efede7;
+    border-radius: 50%;
+    animation: camera-loader .8s linear infinite;
+}
+
+@keyframes camera-loader { to { transform: rotate(1turn); } }
+
+@media (prefers-reduced-motion: reduce) {
+    .camera-story-loading span { animation: none; }
+}
