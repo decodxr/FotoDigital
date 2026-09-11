@@ -82,7 +82,9 @@ Use o host real copiado do seu painel, sem inventar a região ou o número do se
 
 A versão Vercel usa um pool pequeno e `prepare: false`, compatível com o Supavisor em modo Transaction. A validação TLS é obrigatória.
 
-O pool usa uma conexão por instância. A aplicação desativa `fetch_types` porque suas listas são armazenadas como JSON em campos de texto; não utiliza arrays nativos do PostgreSQL. Isso evita a consulta automática a `pg_type` na inicialização do driver. Uma falha nessa consulta interna pode gerar uma rejeição não tratada antes de o aplicativo receber o resultado.
+O pool usa uma conexão por instância e `max_pipeline: 0`. Chamadas concorrentes aguardam na fila do driver; uma nova consulta só é enviada depois que a anterior termina. Isso evita respostas perdidas no Supavisor quando várias transações implícitas são enviadas pelo mesmo socket. No Postgres.js 3.4.9, `max_pipeline: 1` ainda permite uma consulta adicional além da ativa, por isso o valor precisa ser zero.
+
+A aplicação desativa `fetch_types` porque suas listas são armazenadas como JSON em campos de texto; não utiliza arrays nativos do PostgreSQL. Isso evita a consulta automática a `pg_type` na inicialização do driver. Uma falha nessa consulta interna pode gerar uma rejeição não tratada antes de o aplicativo receber o resultado.
 
 Na Vercel, cada consulta tem prazo de 8 segundos, incluindo a fila do pool; transações têm prazo total de 25 segundos. Ao exceder o prazo, a aplicação descarta o pool e registra `database_operation_failed` com etapa, tabela/operação, código e duração, sem parâmetros ou credenciais. Conexões ociosas por mais de 5 segundos são renovadas antes de um novo trabalho para evitar sockets parados após a suspensão da função. Operações de escrita com resultado incerto não são repetidas automaticamente. As únicas repetições de transações continuam sendo para rollback confirmado por serialização/deadlock.
 
@@ -192,6 +194,7 @@ Defina a retenção no administrador. A rotina **Limpar arquivos expirados** exc
 | Erro IPv6 ou timeout | Use o pooler compatível com IPv4 e confira se o projeto está ativo. |
 | `self-signed certificate in certificate chain` | Em Database Settings → SSL Configuration, baixe o certificado CA e cole todo o PEM em `DATABASE_CA_CERT`, incluindo BEGIN/END. Salve em Production e faça Redeploy. |
 | Página presa / timeout de 300 segundos | Confirme o deploy da correção de consultas limitadas. Consulte `database_operation_failed`, filtrando pelo deploy atual. |
+| Primeira consulta funciona, mas várias consultas do catálogo expiram | Confira se o deploy contém `max_pipeline: 0`; isso impede consultas sobrepostas no mesmo socket do Transaction pooler. Não remova o certificado para corrigir esse sintoma. |
 | `57014` / `canceling statement due to statement timeout` | A conexão chegou ao PostgreSQL. Confira a etapa/tabela indicada no log, consultas bloqueadas, saúde do banco e `statement_timeout`. Não desative a verificação SSL. |
 | `relation ... does not exist` | Execute o instalador inteiro no banco correto. |
 | `relation ... already exists` sem migration registrada | Não apague tabelas; revise o esquema de uma tentativa anterior e o histórico `_migrations`. |
@@ -205,6 +208,7 @@ Defina a retenção no administrador. A rotina **Limpar arquivos expirados** exc
 
 ## Referências oficiais
 
+- [Supavisor: respostas perdidas em transações enviadas em pipeline](https://github.com/supabase/supavisor/issues/1061)
 - [Conexão PostgreSQL e poolers](https://supabase.com/docs/guides/database/connecting-to-postgres)
 - [Postgres.js no Supabase](https://supabase.com/docs/guides/database/postgres-js)
 - [Autenticação S3 e endpoint do Storage](https://supabase.com/docs/guides/storage/s3/authentication)

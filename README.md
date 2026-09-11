@@ -126,6 +126,8 @@ npm run build:vercel
 
 Os testes exercitam cálculos de DPI, preços e PIX, documentos, identidade, autorização entre clientes, bootstrap, arquivos originais, checkout persistente, idempotência, ZIP, estados e disputa de estoque. O fluxo da API é executado em SQLite e no motor PostgreSQL/PGlite. Também são verificados instalação repetida do SQL, RLS, bloqueio para anon/authenticated, rollback, parâmetros, configuração do pool e assinatura S3 com o prefixo Supabase. O teste opcional `node tests/worker.test.mjs` exercita o bundle compilado com Miniflare/D1/R2; sua execução requer permissão para abrir o runtime local e não foi concluída neste ambiente. O adapter SQLite/Map usado nos testes é explicitamente isolado em `tests/platform.ts`; não integra o bundle de produção. Integrações externas exigem homologação com credenciais reais e testes de dispositivos/fluxos no domínio escolhido.
 
+O teste de protocolo usa o driver Postgres.js real, TLS e um servidor local com PostgreSQL/PGlite para verificar consultas concorrentes. Requer `openssl` no PATH apenas durante os testes, para gerar um certificado temporário; não adiciona dependência ao servidor de produção. O certificado e a chave de teste são removidos ao terminar.
+
 ## Imagens e conteúdo
 
 Veja [docs/assets.md](docs/assets.md). A identidade visual usa fotografias ilustrativas de bancos de imagem, declaradas como tais. Galerias de inspiração não são apresentadas como portfólio da empresa. Substitua-as pelas fotos autorizadas da loja pelo painel ou assets públicos. Não há avaliações falsas, horários de funcionamento ou preços não informados.
