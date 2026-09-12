@@ -5,7 +5,7 @@ import { Component, useEffect, useRef, useState, type ReactNode, type RefObject 
 import {
     ACESFilmicToneMapping, Box3, Color, Group, Mesh, MeshBasicMaterial,
     MeshPhysicalMaterial, MeshStandardMaterial, PlaneGeometry, PMREMGenerator,
-    Scene, SRGBColorSpace, Texture, Vector3,
+    Scene, SRGBColorSpace, Texture, Vector3, WebGLRenderer,
 } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { cameraPose } from '@/lib/shared/camera-motion';
@@ -203,19 +203,23 @@ class StageBoundary extends Component<{ onError: () => void; children: ReactNode
     render() { return this.state.failed ? null : this.props.children; }
 }
 
-function Unavailable({ onError }: { onError: () => void }) {
-    useEffect(onError, [onError]);
-    return null;
-}
-
 export default function CameraStage(props: CameraStageProps) {
     return <StageBoundary onError={props.onError}>
         <Canvas
             frameloop="demand"
             camera={{ position: [0, 0.15, 7.7], fov: 34, near: 0.1, far: 60 }}
             dpr={props.mobile ? [1, 1.25] : [1, 1.75]}
-            gl={{ alpha: true, antialias: true, powerPreference: 'low-power' }}
-            fallback={<Unavailable onError={props.onError} />}
+            gl={defaults => {
+                try {
+                    return new WebGLRenderer({ ...defaults, alpha: true, antialias: true, powerPreference: 'low-power' });
+                } catch (error) {
+                    // Report actual context creation failures, not fallback mounting.
+                    props.onError();
+                    throw error;
+                }
+            }}
+            // Canvas fallback children mount even when WebGL works. Keep them inert.
+            fallback={<span>Visualização 3D indisponível neste navegador.</span>}
             onCreated={({ gl }) => {
                 gl.toneMapping = ACESFilmicToneMapping;
                 gl.toneMappingExposure = 1.08;
