@@ -130,6 +130,34 @@ O teste de protocolo usa o driver Postgres.js real, TLS e um servidor local com 
 
 ## Imagens e conteúdo
 
+### Câmera vintage 3D
+
+A home usa **Camera 01**, de Rajil Jose Macatangay / Poly Haven, sob CC0. Não é
+um modelo feito pela loja, nem implica vínculo com um fabricante. Fonte, licença,
+adaptações e hashes estão em `public/models/camera/LICENSE.md`. Os arquivos são
+hospedados pelo próprio site; não há iframe, API de terceiros ou segredo em runtime.
+
+`components/store/camera-story.tsx` mantém a narrativa e a imagem estática no HTML.
+O módulo `camera-stage.tsx`, com React Three Fiber/Three.js, só é carregado perto
+da seção. O asset desktop usa texturas 2K (4,05 MB) e o mobile usa 1K (1,67 MB).
+Os materiais PBR preservam os mapas do artista; reflexos vêm de softboxes capturados
+com PMREM. O eixo fica centralizado no corpo; a alça solta da composição original
+fica oculta. O modelo completa uma volta por scroll, com amortecimento e parallax.
+
+O render usa `frameloop="demand"`: desenha enquanto o movimento está se acomodando,
+para ao estabilizar e não fica animando continuamente. Há pausa manual, respeito
+à aba invisível e fallback para falha de carregamento/contexto WebGL. Movimento
+reduzido mostra a imagem renderizada da própria geometria e todos os capítulos,
+sem carregar WebGL. Telas baixas usam conteúdo em fluxo para evitar corte de texto.
+O topo do palco acompanha a altura real do cabeçalho por ResizeObserver.
+
+Para atualizar os assets: `node scripts/prepare-camera.mjs /caminho/cache-camera`.
+O script verifica os hashes fornecidos pelo publicador e usa o Sharp incluído na
+dependência Next.js para empacotar GLBs. Execute a preparação a partir da raiz.
+O pôster pode ser recriado offline com `scripts/render-camera-poster.py` e as
+dependências Python indicadas no arquivo; elas não participam do build/deploy.
+Teste específico: `node --experimental-strip-types --test tests/camera.test.mjs`.
+
 Veja [docs/assets.md](docs/assets.md). A identidade visual usa fotografias ilustrativas de bancos de imagem, declaradas como tais. Galerias de inspiração não são apresentadas como portfólio da empresa. Substitua-as pelas fotos autorizadas da loja pelo painel ou assets públicos. Não há avaliações falsas, horários de funcionamento ou preços não informados.
 
 Políticas de privacidade, envio, trocas e termos estão em `components/store/institutional.tsx` e devem refletir a operação efetiva ao abrir a loja. Referência legal utilizada para compras à distância: [CDC, art. 49](https://www.planalto.gov.br/ccivil_03/leis/l8078compilado.htm).

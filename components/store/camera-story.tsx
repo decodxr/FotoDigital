@@ -1,127 +1,147 @@
 'use client';
 
-import { Canvas, useFrame } from '@react-three/fiber';
-import { Aperture, Focus, ScanLine } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState, type MutableRefObject, type PointerEvent } from 'react';
-import * as THREE from 'three';
-import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
+import { ArrowDown, ArrowUpRight, Pause, Play, RotateCw } from 'lucide-react';
+import { Component, useCallback, useEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react';
+import { cameraChapters, chapterAt, scrollProgress } from '@/lib/shared/camera-motion';
+import type { CameraStageProps } from './camera-stage';
+import { PhotoImage } from './media';
 
-type MotionPoint = { x: number; y: number };
-const chapters = [
-    { index: '01', label: 'Corpo', title: 'Feita para observar.', text: 'Metal, textura e precisão em uma forma que atravessa gerações. Um convite para olhar com calma antes de guardar o instante.', Icon: ScanLine },
-    { index: '02', label: 'Lente', title: 'Luz, textura, presença.', text: 'É pela lente que a luz encontra a memória. Cada reflexo, contraste e detalhe ajuda a contar uma história com verdade.', Icon: Aperture },
-    { index: '03', label: 'Memória', title: 'O clique passa. A memória fica.', text: 'Há mais de duas décadas, transformamos imagens em lembranças para tocar, presentear e manter sempre por perto.', Icon: Focus },
-];
+const CameraStage = dynamic<CameraStageProps>(() => import('./camera-stage'), { ssr: false });
 
-function ease(current: number, target: number, speed: number, delta: number) {
-    return THREE.MathUtils.lerp(current, target, 1 - Math.exp(-speed * delta));
-}
-
-function CameraModel({ progress, pointer }: { progress: MutableRefObject<number>; pointer: MutableRefObject<MotionPoint> }) {
-    const camera = useRef<THREE.Group>(null);
-    const lensGlass = useRef<THREE.Mesh>(null);
-    const body = useMemo(() => new RoundedBoxGeometry(3.55, 2.05, 1.02, 5, 0.13), []);
-    const topPlate = useMemo(() => new RoundedBoxGeometry(3.48, 0.34, 0.96, 4, 0.08), []);
-
-    useFrame((state, delta) => {
-        if (!camera.current) return;
-        const p = progress.current;
-        camera.current.rotation.y = ease(camera.current.rotation.y, -0.62 + p * Math.PI * 2.12 + pointer.current.x * 0.12, 4.7, delta);
-        camera.current.rotation.x = ease(camera.current.rotation.x, -0.06 + Math.sin(p * Math.PI) * 0.08 + pointer.current.y * 0.05, 4, delta);
-        camera.current.rotation.z = ease(camera.current.rotation.z, Math.sin(p * Math.PI * 2) * 0.025 - pointer.current.x * 0.018, 4, delta);
-        camera.current.position.y = ease(camera.current.position.y, Math.sin(state.clock.elapsedTime * 0.7) * 0.055 - pointer.current.y * 0.08, 2.4, delta);
-        camera.current.position.x = ease(camera.current.position.x, (p - 0.5) * 0.16 + pointer.current.x * 0.09, 3.5, delta);
-        if (lensGlass.current) lensGlass.current.rotation.z += delta * 0.06;
-    });
-
-    const metal = '#b8b9b7';
-    const darkMetal = '#242525';
-    return <group ref={camera} scale={1.05}>
-        <mesh geometry={body} castShadow receiveShadow><meshPhysicalMaterial color="#111211" roughness={0.68} metalness={0.18} clearcoat={0.22} clearcoatRoughness={0.6} /></mesh>
-        <mesh geometry={topPlate} position={[0, 0.88, 0.01]} castShadow><meshStandardMaterial color={metal} metalness={0.9} roughness={0.25} /></mesh>
-        <mesh position={[0, -0.94, 0]} scale={[3.42, 0.17, 0.94]} castShadow><boxGeometry /><meshStandardMaterial color={darkMetal} metalness={0.78} roughness={0.29} /></mesh>
-        <mesh position={[-0.9, 0.34, 0.555]} castShadow><boxGeometry args={[0.64, 0.38, 0.08]} /><meshPhysicalMaterial color="#151a1b" roughness={0.18} clearcoat={0.9} /></mesh>
-        <mesh position={[-0.9, 0.34, 0.602]}><planeGeometry args={[0.43, 0.21]} /><meshPhysicalMaterial color="#6c9895" emissive="#133334" emissiveIntensity={0.35} roughness={0.08} clearcoat={1} /></mesh>
-        <mesh position={[0.02, 0.41, 0.555]}><circleGeometry args={[0.18, 32]} /><meshPhysicalMaterial color="#403f36" emissive="#7c642a" emissiveIntensity={0.12} roughness={0.18} clearcoat={1} /></mesh>
-
-        <group position={[0.66, -0.06, 0.68]} rotation={[Math.PI / 2, 0, 0]}>
-            <mesh castShadow><cylinderGeometry args={[0.82, 0.87, 0.42, 64]} /><meshStandardMaterial color="#161716" metalness={0.78} roughness={0.24} /></mesh>
-            <mesh position={[0, -0.27, 0]} castShadow><cylinderGeometry args={[0.71, 0.78, 0.18, 64]} /><meshStandardMaterial color={metal} metalness={0.94} roughness={0.17} /></mesh>
-            <mesh position={[0, -0.42, 0]} castShadow><cylinderGeometry args={[0.61, 0.69, 0.18, 64]} /><meshStandardMaterial color="#111211" metalness={0.82} roughness={0.2} /></mesh>
-            <mesh position={[0, -0.53, 0]} ref={lensGlass}><cylinderGeometry args={[0.52, 0.57, 0.07, 64]} /><meshPhysicalMaterial color="#142b33" emissive="#061217" emissiveIntensity={0.2} roughness={0.05} transmission={0.3} thickness={0.5} clearcoat={1} iridescence={0.4} /></mesh>
-            <mesh position={[0, -0.57, 0]}><circleGeometry args={[0.27, 48]} /><meshBasicMaterial color="#050707" /></mesh>
-        </group>
-
-        <mesh position={[-1.24, 1.12, 0.03]} castShadow><cylinderGeometry args={[0.34, 0.34, 0.16, 36]} /><meshStandardMaterial color={darkMetal} metalness={0.9} roughness={0.25} /></mesh>
-        <mesh position={[-1.24, 1.215, 0.03]} rotation={[-Math.PI / 2, 0, 0]}><circleGeometry args={[0.24, 32]} /><meshStandardMaterial color="#8f908e" metalness={0.95} roughness={0.21} /></mesh>
-        <mesh position={[1.16, 1.1, 0.01]} castShadow><cylinderGeometry args={[0.29, 0.29, 0.18, 36]} /><meshStandardMaterial color={darkMetal} metalness={0.9} roughness={0.24} /></mesh>
-        <mesh position={[1.16, 1.205, 0.01]} rotation={[-Math.PI / 2, 0, 0]}><circleGeometry args={[0.2, 32]} /><meshStandardMaterial color="#b9bab8" metalness={0.96} roughness={0.18} /></mesh>
-        <mesh position={[0.72, 1.13, 0.12]} castShadow><cylinderGeometry args={[0.105, 0.105, 0.19, 24]} /><meshStandardMaterial color="#d2d2cf" metalness={0.98} roughness={0.16} /></mesh>
-        {[-1.74, 1.74].map(x => <mesh key={x} position={[x, 0.12, 0]} rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[0.18, 0.045, 10, 24]} /><meshStandardMaterial color={metal} metalness={0.92} roughness={0.24} /></mesh>)}
-        {[-1.4, 1.42].map(x => <mesh key={x} position={[x, -0.64, 0.55]}><circleGeometry args={[0.055, 18]} /><meshStandardMaterial color="#8e8f8d" metalness={0.95} roughness={0.22} /></mesh>)}
-        <mesh position={[-0.62, -0.05, -0.555]}><boxGeometry args={[1.35, 0.93, 0.05]} /><meshStandardMaterial color="#0a0b0a" roughness={0.8} /></mesh>
-    </group>;
-}
-
-function CameraScene({ progress, pointer }: { progress: MutableRefObject<number>; pointer: MutableRefObject<MotionPoint> }) {
-    return <><ambientLight intensity={0.46} color="#d9e2e0" /><directionalLight position={[-4, 5, 5]} intensity={3.1} color="#fff7e8" /><directionalLight position={[4, 1, 2]} intensity={2.3} color="#b9dfe4" /><pointLight position={[0, -2, 3]} intensity={8} distance={7} color="#ab7651" /><CameraModel progress={progress} pointer={pointer} /><mesh position={[0, -1.63, -0.1]} rotation={[-Math.PI / 2, 0, 0]} scale={[2.9, 1.2, 1]}><circleGeometry args={[1, 48]} /><meshBasicMaterial color="#000000" transparent opacity={0.27} depthWrite={false} /></mesh></>;
+class CameraLoadBoundary extends Component<{ children: ReactNode; onError: () => void }, { failed: boolean }> {
+    state = { failed: false };
+    static getDerivedStateFromError() { return { failed: true }; }
+    componentDidCatch() { this.props.onError(); }
+    render() { return this.state.failed ? null : this.props.children; }
 }
 
 export function CameraStory() {
-    const sectionRef = useRef<HTMLElement>(null);
+    const section = useRef<HTMLElement>(null);
+    const sticky = useRef<HTMLDivElement>(null);
     const progress = useRef(0);
-    const pointer = useRef<MotionPoint>({ x: 0, y: 0 });
-    const frame = useRef<number | null>(null);
+    const pointer = useRef({ x: 0, y: 0 });
+    const invalidate = useRef<(() => void) | null>(null);
+    const activeRef = useRef(0);
     const [active, setActive] = useState(0);
+    const [nearby, setNearby] = useState(false);
     const [visible, setVisible] = useState(false);
-    const [reducedMotion, setReducedMotion] = useState(false);
+    const [reduced, setReduced] = useState(false);
+    const [paused, setPaused] = useState(false);
+    const [mobile, setMobile] = useState(false);
+    const [ready, setReady] = useState(false);
+    const [failed, setFailed] = useState(false);
+    const [attempt, setAttempt] = useState(0);
 
     useEffect(() => {
-        const query = window.matchMedia('(prefers-reduced-motion: reduce)');
-        const sync = () => setReducedMotion(query.matches);
-        sync(); query.addEventListener('change', sync);
-        return () => query.removeEventListener('change', sync);
+        const motion = matchMedia('(prefers-reduced-motion: reduce)');
+        const small = matchMedia('(max-width: 760px)');
+        const sync = () => { setReduced(motion.matches); setMobile(small.matches); };
+        sync();
+        motion.addEventListener('change', sync);
+        small.addEventListener('change', sync);
+        return () => { motion.removeEventListener('change', sync); small.removeEventListener('change', sync); };
     }, []);
+
     useEffect(() => {
-        const element = sectionRef.current;
-        if (!element) return;
-        const observer = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting), { rootMargin: '30% 0px' });
-        observer.observe(element);
-        return () => observer.disconnect();
+        if (!section.current) return;
+        const preload = new IntersectionObserver(([entry]) => {
+            if (entry.isIntersecting) { setNearby(true); preload.disconnect(); }
+        }, { rootMargin: '450px 0px' });
+        const visibility = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting));
+        preload.observe(section.current);
+        visibility.observe(section.current);
+        return () => { preload.disconnect(); visibility.disconnect(); };
     }, []);
+
     useEffect(() => {
-        if (reducedMotion) return;
+        const element = section.current;
+        const stage = sticky.current;
+        if (!element || !stage) return;
+        const header = document.querySelector<HTMLElement>('.site-header');
+        let frame = 0;
         const update = () => {
-            frame.current = null;
-            const element = sectionRef.current;
-            if (!element) return;
+            frame = 0;
             const rect = element.getBoundingClientRect();
-            const next = THREE.MathUtils.clamp(-rect.top / Math.max(1, rect.height - window.innerHeight), 0, 1);
-            progress.current = next;
-            setActive(Math.min(chapters.length - 1, Math.floor(next * chapters.length)));
+            const inset = header?.getBoundingClientRect().height ?? 0;
+            element.style.setProperty('--camera-top', inset + 'px');
+            const next = scrollProgress(rect.top, rect.height, stage.offsetHeight, inset, innerHeight);
+            progress.current = reduced ? 0 : next;
+            element.style.setProperty('--camera-progress', String(next));
+            const chapter = chapterAt(next);
+            if (chapter !== activeRef.current) { activeRef.current = chapter; setActive(chapter); }
+            invalidate.current?.();
         };
-        const onScroll = () => { if (frame.current === null) frame.current = requestAnimationFrame(update); };
-        update(); window.addEventListener('scroll', onScroll, { passive: true }); window.addEventListener('resize', onScroll);
-        return () => { window.removeEventListener('scroll', onScroll); window.removeEventListener('resize', onScroll); if (frame.current !== null) cancelAnimationFrame(frame.current); };
-    }, [reducedMotion]);
+        const schedule = () => { if (!frame) frame = requestAnimationFrame(update); };
+        const observer = new ResizeObserver(schedule);
+        observer.observe(element);
+        if (header) observer.observe(header);
+        update();
+        addEventListener('scroll', schedule, { passive: true });
+        addEventListener('resize', schedule);
+        return () => {
+            removeEventListener('scroll', schedule);
+            removeEventListener('resize', schedule);
+            observer.disconnect();
+            cancelAnimationFrame(frame);
+        };
+    }, [reduced]);
 
-    const onPointerMove = (event: PointerEvent<HTMLElement>) => {
-        if (reducedMotion) return;
+    const move = (event: PointerEvent<HTMLDivElement>) => {
+        if (reduced || paused || event.pointerType === 'touch') return;
         const rect = event.currentTarget.getBoundingClientRect();
-        pointer.current = { x: ((event.clientX - rect.left) / rect.width - 0.5) * 2, y: ((event.clientY - rect.top) / Math.min(rect.height, window.innerHeight) - 0.5) * 2 };
+        pointer.current = { x: (event.clientX - rect.left) / rect.width * 2 - 1, y: (event.clientY - rect.top) / rect.height * 2 - 1 };
+        invalidate.current?.();
     };
+    const resetPointer = () => { pointer.current = { x: 0, y: 0 }; invalidate.current?.(); };
+    const revealChapter = (index: number) => {
+        const element = section.current;
+        const stage = sticky.current;
+        if (!element || !stage) return;
+        const inset = Number.parseFloat(getComputedStyle(element).getPropertyValue('--camera-top')) || 0;
+        if (reduced || matchMedia('(max-height: 620px)').matches) {
+            document.getElementById('camera-chapter-' + index)?.scrollIntoView({ block: 'center', behavior: 'auto' });
+            return;
+        }
+        const ratio = [0.04, 0.5, 0.96][index];
+        scrollTo({ top: scrollY + element.getBoundingClientRect().top - inset + ratio * (element.offsetHeight - stage.offsetHeight), behavior: 'smooth' });
+    };
+    const onReady = useCallback(() => setReady(true), []);
+    const onError = useCallback(() => { setFailed(true); setReady(false); }, []);
 
-    return <section className={`camera-story${reducedMotion ? ' is-reduced' : ''}`} ref={sectionRef} onPointerMove={onPointerMove} onPointerLeave={() => { pointer.current = { x: 0, y: 0 }; }} aria-labelledby="camera-story-title">
-        <div className="camera-story-sticky"><div className="camera-story-glow" aria-hidden="true" /><div className="camera-story-grid container">
-            <div className="camera-story-visual" aria-label="Modelo tridimensional autoral de uma câmera fotográfica vintage">
-                <Canvas camera={{ position: [0, 0.08, 6.6], fov: 34 }} dpr={[1, 1.5]} frameloop={visible ? 'always' : 'demand'} gl={{ alpha: true, antialias: true, powerPreference: 'high-performance' }}><CameraScene progress={progress} pointer={pointer} /></Canvas>
-                <div className="camera-story-orbit" aria-hidden="true"><span /></div><p className="camera-story-caption">Modelo 3D autoral · inspirado em câmeras clássicas</p>
+    return <section ref={section} className={'camera-story' + (reduced ? ' is-reduced' : '')} aria-labelledby="camera-story-title">
+        <div className="camera-story-sticky" ref={sticky}>
+            <div className="camera-story-panel">
+                <div className="camera-story-masthead"><span>A ESSÊNCIA DE FOTOGRAFAR</span><span>FOTO DIGITAL <b> / </b> DESDE 2003</span></div>
+                <div className="camera-story-composition">
+                    <div className="camera-story-visual" onPointerMove={move} onPointerLeave={resetPointer}>
+                        <span className="camera-story-watermark" aria-hidden="true">MEMÓRIAS</span>
+                        <div className={'camera-story-poster' + (ready && !reduced ? ' is-hidden' : '')}>
+                            <PhotoImage src="/models/camera/camera-poster.webp" alt="Câmera fotográfica vintage em metal e couro, com lente de vidro" width={1200} height={960} loading="lazy" />
+                        </div>
+                        {nearby && !reduced && !failed && <div className="camera-story-canvas" aria-hidden="true">
+                            <CameraLoadBoundary key={attempt} onError={onError}><CameraStage progress={progress} pointer={pointer} invalidateRef={invalidate} visible={visible} paused={paused} mobile={mobile} onReady={onReady} onError={onError} /></CameraLoadBoundary>
+                        </div>}
+                        <div className="camera-story-visual-footer"><span>CÂMERA ANALÓGICA <span className="camera-story-dot">·</span> ESTUDO DE LUZ</span>
+                            {!reduced && <button type="button" className="camera-story-motion" onClick={() => { setPaused(value => !value); resetPointer(); }} aria-label={paused ? 'Retomar movimento da câmera' : 'Pausar movimento da câmera'} aria-pressed={paused}>{paused ? <Play size={15} /> : <Pause size={15} />}</button>}
+                        </div>
+                        {nearby && !ready && !failed && !reduced && <span className="camera-story-loading-note" role="status">Preparando a câmera em 3D…</span>}
+                        {failed && <button type="button" className="camera-story-retry" onClick={() => { setFailed(false); setAttempt(value => value + 1); }}><RotateCw size={15} /> Recarregar visualização 3D</button>}
+                    </div>
+                    <div className="camera-story-copy">
+                        <div className="camera-story-intro"><span className="camera-story-kicker">UM OUTRO TEMPO. A MESMA EMOÇÃO.</span><h2 id="camera-story-title">O tempo passa.<br /><span>O olhar fica.</span></h2></div>
+                        <div className="camera-story-chapters">{cameraChapters.map((chapter, index) => <article id={'camera-chapter-' + index} className={'camera-story-chapter' + (index === active ? ' is-active' : '')} key={chapter.label}>
+                            <span className="camera-story-chapter-number" aria-hidden="true">0{index + 1} <span>/</span> 03</span>
+                            <h3>{chapter.title}</h3><p>{chapter.text}</p>
+                        </article>)}</div>
+                        <Link className="camera-story-link" href="/revelacao">Dê vida às suas lembranças <ArrowUpRight size={19} /></Link>
+                        <nav className="camera-story-navigation" aria-label="Explorar a câmera">{cameraChapters.map((chapter, index) => <button type="button" key={chapter.label} aria-current={active === index ? 'step' : undefined} onClick={() => revealChapter(index)}><span>0{index + 1}</span>{chapter.label}</button>)}</nav>
+                    </div>
+                </div>
+                <div className="camera-story-footer"><span className="camera-story-scroll"><ArrowDown size={14} /> Role e descubra cada detalhe</span><a href="https://polyhaven.com/a/Camera_01" target="_blank" rel="noreferrer">Modelo: Rajil Jose Macatangay / Poly Haven · CC0</a></div>
+                <div className="camera-story-progress" aria-hidden="true"><span /></div>
             </div>
-            <div className="camera-story-copy"><div className="camera-story-intro"><span className="camera-story-kicker">O OLHAR POR TRÁS DE CADA MEMÓRIA</span><h2 id="camera-story-title">Uma câmera.<br />Mil maneiras de lembrar.</h2></div>
-                <div className="camera-story-chapters">{chapters.map(({ index, label, title, text, Icon }, chapterIndex) => <article className={`camera-story-chapter${active === chapterIndex ? ' is-active' : ''}`} key={index} aria-hidden={!reducedMotion && active !== chapterIndex}><div className="camera-story-meta"><span>{index}</span><Icon size={18} strokeWidth={1.35} /><span>{label}</span></div><h3>{title}</h3><p>{text}</p>{chapterIndex === chapters.length - 1 && <Link href="/fotografia" className="camera-story-link">Conheça nosso olhar <span aria-hidden="true">↗</span></Link>}</article>)}</div>
-                <div className="camera-story-progress" aria-label={`Capítulo ${active + 1} de ${chapters.length}`}>{chapters.map((chapter, index) => <span key={chapter.index} className={index <= active ? 'is-filled' : ''} />)}</div>
-            </div>
-        </div><div className="camera-story-scroll" aria-hidden="true"><span>↓</span><span>Role para explorar</span></div></div>
+        </div>
     </section>;
 }

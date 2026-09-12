@@ -1,17 +1,13 @@
 'use client';
 
 import { ArrowRight, ArrowUpRight, Camera, Gift, ImageIcon, MapPin, Printer, Star, Truck } from 'lucide-react';
-import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useStore } from './context';
 import { PhotoImage } from './media';
 import { ProductCard } from './ui';
 import { PhotoShowcase } from './showcase';
 
-const CameraStory = dynamic(() => import('./camera-story').then(module => module.CameraStory), {
-    ssr: false,
-    loading: () => <div className="camera-story-loading" aria-label="Carregando experiência fotográfica"><span /></div>,
-});
+import { CameraStory } from './camera-story';
 
 const images = {
     memories: 'https://images.pexels.com/photos/7015070/pexels-photo-7015070.jpeg?auto=compress&cs=tinysrgb&w=1400',

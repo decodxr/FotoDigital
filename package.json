@@ -10,7 +10,7 @@
     "dev": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vite",
     "build": "bash scripts/build-verified.sh",
     "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
-    "test": "node --experimental-strip-types --test tests/commerce.test.mjs tests/integration.test.mjs tests/supabase.test.mjs tests/database-runtime.test.mjs tests/postgres-wire.test.mjs",
+    "test": "node --experimental-strip-types --test tests/commerce.test.mjs tests/integration.test.mjs tests/supabase.test.mjs tests/database-runtime.test.mjs tests/postgres-wire.test.mjs tests/camera.test.mjs",
     "lint": "bash scripts/sites-env.sh -- eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "bash scripts/sites-env.sh -- drizzle-kit generate",
     "typecheck": "tsc --noEmit",
